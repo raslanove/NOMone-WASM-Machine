@@ -1,15 +1,13 @@
-package com.nomone.wasm_machine;
+package com.nomone.wasm_machine.samples.hello_wasm;
 
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
 
-public class MainActivity extends Activity {
+import com.nomone.wasm_machine.WasmMachineNatives;
 
-    static {
-        System.loadLibrary("WasmMachine");
-    }
+public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -17,10 +15,8 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
         TextView textView = findViewById(R.id.hello_textView);
-        textView.setText(compileWasmToBites());
+        textView.setText(WasmMachineNatives.compileWasmToBites());
 
         textView.postDelayed(() -> Log.e("sdf", "besm Allah :)"), 1000);
     }
-
-    public native String compileWasmToBites();
 }
