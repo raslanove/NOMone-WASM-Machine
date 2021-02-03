@@ -11,11 +11,11 @@ cmake_minimum_required(VERSION 3.4.1)
 # Gradle automatically packages shared libraries with your APK.
 
 set(SRC
-        src/main/cpp/java_interface.cpp
-        ../../../Src/wasm_machine.c)
+        ../../../Src/Backends/Android/Cpp/JavaInterface.cpp
+        ../../../Src/WasmMachine.c)
 
 add_library( # Sets the name of the library.
-             wasm_machine
+             WasmMachine
 
              # Sets the library as a shared library.
              SHARED
@@ -43,7 +43,7 @@ find_library( # Sets the name of the path variable.
 # build script, prebuilt third-party libraries, or system libraries.
 
 target_link_libraries( # Specifies the target library.
-                       wasm_machine
+                       WasmMachine
 
                        android
                        ${log-lib} )

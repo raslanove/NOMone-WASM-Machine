@@ -8,7 +8,7 @@ import android.widget.TextView;
 public class MainActivity extends Activity {
 
     static {
-        System.loadLibrary("wasm_machine");
+        System.loadLibrary("WasmMachine");
     }
 
     @Override

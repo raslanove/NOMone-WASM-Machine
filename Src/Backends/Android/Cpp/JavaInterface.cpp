@@ -1,7 +1,7 @@
 #include <jni.h>
 
 extern "C" {
-    #include <wasm_machine.h>
+    #include <WasmMachine.h>
 };
 
 extern "C" JNIEXPORT jstring JNICALL
