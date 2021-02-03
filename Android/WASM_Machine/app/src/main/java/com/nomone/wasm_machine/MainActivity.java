@@ -8,7 +8,7 @@ import android.widget.TextView;
 public class MainActivity extends Activity {
 
     static {
-        System.loadLibrary("native-lib");
+        System.loadLibrary("wasm_machine");
     }
 
     @Override
@@ -17,10 +17,10 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
         TextView textView = findViewById(R.id.hello_textView);
-        textView.setText(stringFromJNI());
+        textView.setText(compileWasmToBites());
 
         textView.postDelayed(() -> Log.e("sdf", "besm Allah :)"), 1000);
     }
 
-    public native String stringFromJNI();
+    public native String compileWasmToBites();
 }
