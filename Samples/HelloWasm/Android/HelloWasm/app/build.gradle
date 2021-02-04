@@ -24,7 +24,7 @@ android {
         }
     }
     sourceSets {
-        main.java.srcDirs += 'src/main/../../../../../Src/Backends/Android/Java'
+        main.java.srcDirs += '../../../../../Src/Backends/Android/Java'
     }
     externalNativeBuild {
         cmake {

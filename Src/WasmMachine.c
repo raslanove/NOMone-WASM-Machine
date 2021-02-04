@@ -1,16 +1,17 @@
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
 int jump(int a, int b) {
 
-    static const int array[] = {(int) &&returnPosition - (int) &&startPosition};
+    static const int array[] = {(intptr_t) &&returnPosition - (intptr_t) &&startPosition};
 
     startPosition:
     returnPosition:
 
     if (a < b) {
         a *= 2;
-        goto *(void *) ((int) && startPosition + array[0]);
+        goto *(void *) ((intptr_t) && startPosition + array[0]);
     }
 
     return a;

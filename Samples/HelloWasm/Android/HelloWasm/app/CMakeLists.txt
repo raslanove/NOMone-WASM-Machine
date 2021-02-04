@@ -11,8 +11,8 @@ cmake_minimum_required(VERSION 3.4.1)
 # Gradle automatically packages shared libraries with your APK.
 
 set(SRC
-        ../../../Src/Backends/Android/Cpp/NativeInterface.cpp
-        ../../../Src/WasmMachine.c)
+        ../../../../../Src/Backends/Android/Cpp/NativeInterface.cpp
+        ../../../../../Src/WasmMachine.c)
 
 add_library( # Sets the name of the library.
              WasmMachine
@@ -23,7 +23,7 @@ add_library( # Sets the name of the library.
              # Provides a relative path to your source file(s).
              ${SRC} )
 
-include_directories( ../../../Src/Includes/ )
+include_directories( ../../../../../Src/Includes/ )
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
