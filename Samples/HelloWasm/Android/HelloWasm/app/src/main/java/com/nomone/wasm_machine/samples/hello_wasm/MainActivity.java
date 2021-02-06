@@ -15,7 +15,7 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
         TextView textView = findViewById(R.id.hello_textView);
-        textView.setText(WasmMachineNatives.compileWasmToBites());
+        textView.setText(WasmMachineNatives.compileWasmToBites("besm Allah AlRa7maan AlRa7eem :)"));
 
         textView.postDelayed(() -> Log.e("sdf", "besm Allah :)"), 1000);
     }

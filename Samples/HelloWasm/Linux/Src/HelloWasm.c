@@ -1,11 +1,13 @@
 #include <WasmMachine.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 
 void main(void) {
 
-    char message[256];
-    compileWasmToBites(message);
+    char watCode[] = "besm Allah AlRa7maan AlRa7eem :)";
+    char *biteCode = compileWasmToBites(watCode);
 
-    printf("%s\n", message);    
+    printf("%s\n", biteCode);
+    free(biteCode);
 }

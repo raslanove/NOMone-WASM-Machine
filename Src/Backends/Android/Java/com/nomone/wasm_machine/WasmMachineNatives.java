@@ -6,9 +6,9 @@ public class WasmMachineNatives {
         System.loadLibrary("WasmMachine");
     }
 
-    public static String compileWasmToBites() {
-        return nativeCompileWasmToBites();
+    public static String compileWasmToBites(String watCode) {
+        return nativeCompileWasmToBites(watCode);
     }
 
-    public static native String nativeCompileWasmToBites();
+    public static native String nativeCompileWasmToBites(String watCode);
 }

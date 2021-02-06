@@ -1,3 +1,3 @@
 #pragma once
 
-void compileWasmToBites(char *message);
+char* compileWasmToBites(const char *watCode);

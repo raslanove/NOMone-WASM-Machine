@@ -1,7 +1,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
+#include <WasmMachine.h>
+
+// Reference code on how to do tail calling (threaded code) in portable C program,
 int jump(int a, int b) {
 
     static const int array[] = {(intptr_t) &&returnPosition - (intptr_t) &&startPosition};
@@ -17,9 +21,10 @@ int jump(int a, int b) {
     return a;
 }
 
-void compileWasmToBites(char *message) {
+char* compileWasmToBites(const char* watCode) {
 
-    // Test the jumping,
-    int jumpResult = jump(3, 25);
-    sprintf(message, "besm Allah: %d", jumpResult);
+    // Just echo for now,
+    char* value = malloc(strlen(watCode)+1);
+    sprintf(value, "%s", watCode);
+    return value;
 }
