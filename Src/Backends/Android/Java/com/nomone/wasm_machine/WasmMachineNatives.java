@@ -7,8 +7,10 @@ public class WasmMachineNatives {
     }
 
     public static String compileWasmToBites(String watCode) {
-        return nativeCompileWasmToBites(watCode);
+        //return nativeCompileWasmToBites(watCode);
+        return "besm Allah";
     }
 
-    public static native String nativeCompileWasmToBites(String watCode);
+    //public static native String nativeCompileWasmToBites(String watCode);
+    public static native int nativeCreateReferenceMachine();
 }

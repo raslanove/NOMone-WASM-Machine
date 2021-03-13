@@ -4,6 +4,7 @@ extern "C" {
     #include <WasmMachine.h>
 };
 
+/*
 JNI_CALL_PREFIX jstring JNICALL JNI_FUNCTION_NAME_PREFIX(nativeCompileWasmToBites)(JNI_FUNCTION_SIGNATURE_PREFIX, jstring watCode) {
 
     const char* nativeString = env->GetStringUTFChars(watCode, 0);
@@ -13,4 +14,10 @@ JNI_CALL_PREFIX jstring JNICALL JNI_FUNCTION_NAME_PREFIX(nativeCompileWasmToBite
     delete biteCode;
 
     return returnString;
+}
+*/
+
+JNI_CALL_PREFIX int JNICALL JNI_FUNCTION_NAME_PREFIX(nativeCreateReferenceMachine)(JNI_FUNCTION_SIGNATURE_PREFIX) {
+
+    return 0;
 }

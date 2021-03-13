@@ -1,9 +1,15 @@
 #include <stdint.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include <WasmMachine.h>
+#include <ReferenceMachine.h>
+
+const struct NWM_Interface NWM = {
+    .createReferenceWasmMachine = NWM_createReferenceWasmMachine
+};
+
+///////////////////////////////////////
+// Code experiments and extras
+///////////////////////////////////////
 
 // Reference code on how to do tail calling (threaded code) in portable C program,
 int jump(int a, int b) {
@@ -19,12 +25,4 @@ int jump(int a, int b) {
     }
 
     return a;
-}
-
-char* compileWasmToBites(const char* watCode) {
-
-    // Just echo for now,
-    char* value = malloc(strlen(watCode)+1);
-    sprintf(value, "%s", watCode);
-    return value;
 }
