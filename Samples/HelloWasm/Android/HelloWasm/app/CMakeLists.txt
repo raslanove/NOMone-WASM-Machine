@@ -13,7 +13,8 @@ cmake_minimum_required(VERSION 3.4.1)
 set(SRC
         ../../../../../Src/Backends/Android/Cpp/NativeInterface.cpp
         ../../../../../Src/WasmMachine.c
-        ../../../../../Src/ReferenceMachine.c)
+        ../../../../../Src/ReferenceMachine.c
+        ../../../../../Src/Vector.c)
 
 add_library( # Sets the name of the library.
              WasmMachine

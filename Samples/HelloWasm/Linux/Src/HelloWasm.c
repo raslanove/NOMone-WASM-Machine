@@ -1,7 +1,8 @@
-#include <WasmMachine.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <WasmMachine.h>
 
 void main(void) {
 
