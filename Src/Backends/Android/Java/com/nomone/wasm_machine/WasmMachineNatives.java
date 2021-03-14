@@ -6,11 +6,11 @@ public class WasmMachineNatives {
         System.loadLibrary("WasmMachine");
     }
 
-    public static String compileWasmToBites(String watCode) {
-        //return nativeCompileWasmToBites(watCode);
-        return "besm Allah";
-    }
+    public static int createReferenceMachine() { return nativeCreateReferenceMachine(); }
+    public static void destroyMachine(int machineIndex) { nativeDestroyMachine(machineIndex); }
+    public static String compileWasmToBites(int machineIndex, String watCode) { return nativeCompileWasmToBites(machineIndex, watCode); }
 
-    //public static native String nativeCompileWasmToBites(String watCode);
-    public static native int nativeCreateReferenceMachine();
+    private static native String nativeCompileWasmToBites(int machineIndex, String watCode);
+    private static native int nativeCreateReferenceMachine();
+    private static native void nativeDestroyMachine(int machineIndex);
 }

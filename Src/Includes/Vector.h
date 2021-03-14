@@ -12,14 +12,19 @@
 
 #include <stdint.h>
 
-typedef enum { false, true } bool;
+#ifndef BOOL
+#define BOOL
+typedef enum { False=0, True=1 } boolean;
+#endif
 
 struct NVector_Interface {
-    struct NVector* (*create)(int32_t initialCapacity, int32_t objectSize);
-    void (*free)(struct NVector* vector);
-    bool (*pushBack)(struct NVector* vector, const void *object);
-    bool (*popBack)(struct NVector* vector, void *outputObject);
+    struct NVector* (*create)(int32_t initialCapacity, int32_t objectSize, struct NVector* outputVector);
+    struct NVector* (*createInHeap)(int32_t initialCapacity, int32_t objectSize);
+    void (*destroy)(struct NVector* vector);
+    boolean (*pushBack)(struct NVector* vector, const void *object);
+    boolean (*popBack)(struct NVector* vector, void *outputObject);
     void* (*get)(struct NVector* vector, int32_t index);
+    int32_t (*size)(struct NVector* vector);
 };
 
 struct NVector {

@@ -9,8 +9,9 @@ void main(void) {
     char watCode[] = "besm Allah AlRa7maan AlRa7eem :)";
     char *biteCode;
     
-    struct NWM_WasmMachine* machine = NWM.createReferenceWasmMachine();
-    biteCode = machine->compileWasmToBites(watCode);
+    struct NWM_WasmMachine* machine = NWM.createReferenceWasmMachineInHeap();
+    biteCode = machine->compileWasmToBites(machine, watCode);
+    machine->destroy(machine);
     free(machine);
     
     printf("%s\n", biteCode);

@@ -4,7 +4,8 @@
 #include <ReferenceMachine.h>
 
 const struct NWM_Interface NWM = {
-    .createReferenceWasmMachine = NWM_createReferenceWasmMachine
+    .createReferenceWasmMachine = NWM_createReferenceWasmMachine,
+    .createReferenceWasmMachineInHeap = NWM_createReferenceWasmMachineInHeap
 };
 
 ///////////////////////////////////////

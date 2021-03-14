@@ -1,11 +1,12 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <Vector.h>
 
 void main(void) {
 
-    struct NVector *vector = NVector.create(0, 4);
+    struct NVector *vector = NVector.createInHeap(0, 4);
     
     int value=0;
     NVector.pushBack(vector, &value);
@@ -28,8 +29,9 @@ void main(void) {
     printf("Get(1): %d\n", *(int *) NVector.get(vector, 1));
     printf("Get(2): %d\n", *(int *) NVector.get(vector, 2));
  
-    printf("Capacity: %d\n", vector->capacity);
-    printf("Objects count: %d\n", vector->objectsCount);
+    printf("Capacity. Expecting 4, got: %d\n", vector->capacity);
+    printf("Objects count. Expecting 3, got: %d\n", vector->objectsCount);
  
-    NVector.free(vector);
+    NVector.destroy(vector);
+    free(vector);
 }

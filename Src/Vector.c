@@ -5,40 +5,46 @@
 
 #define NVECTOR_BOUNDARY_CHECK 1
 
-static struct NVector* create(int32_t initialCapacity, int32_t objectSize) {
+static struct NVector* create(int32_t initialCapacity, int32_t objectSize, struct NVector* outputVector) {
+
+    if (objectSize==0) return 0;
+
+    memset(outputVector, 0, sizeof(struct NVector));
+
+    outputVector->capacity = initialCapacity;
+    outputVector->objectSize = objectSize;
+    outputVector->objectsCount = 0;
+
+    if (initialCapacity > 0) outputVector->objects = malloc(initialCapacity * objectSize);
+
+    return outputVector;
+}
+
+static struct NVector* createInHeap(int32_t initialCapacity, int32_t objectSize) {
 
     if (objectSize==0) return 0;
 
     struct NVector* vector = malloc(sizeof(struct NVector));;
-    memset(vector, 0, sizeof(struct NVector));
-
-    vector->capacity = initialCapacity;
-    vector->objectSize = objectSize;
-    vector->objectsCount = 0;
-
-    if (initialCapacity > 0) vector->objects = malloc(initialCapacity * objectSize);
-
-    return vector;
+    return create(initialCapacity, objectSize, vector);
 }
 
-static void freeVector(struct NVector* vector) {
+static void destroy(struct NVector* vector) {
     free(vector->objects);
     memset(vector, 0, sizeof(struct NVector));
-    free(vector);
 }
 
-static bool pushBack(struct NVector* vector, const void *object) {
+static boolean pushBack(struct NVector* vector, const void *object) {
 
     // Double the vector capacity if needed,
     if (vector->objectsCount == vector->capacity) {
         if (vector->capacity == 0) {
             vector->objects = malloc(vector->objectSize);
-            if (!vector->objects) return false;
+            if (!vector->objects) return False;
             vector->capacity = 1;
         } else {
             int32_t originalSizeBytes = vector->capacity * vector->objectSize;
             void *newArray = malloc(originalSizeBytes << 1);
-            if (!newArray) return false;
+            if (!newArray) return False;
             memcpy(newArray, vector->objects, originalSizeBytes);
             free(vector->objects);
             vector->objects = newArray;
@@ -51,17 +57,17 @@ static bool pushBack(struct NVector* vector, const void *object) {
     memcpy(newObjectPointer, object, vector->objectSize);
     vector->objectsCount++;
 
-    return true;
+    return True;
 }
 
-static bool popBack(struct NVector* vector, void *outputObject) {
-    if (vector->objectsCount==0) return false;
+static boolean popBack(struct NVector* vector, void *outputObject) {
+    if (vector->objectsCount==0) return False;
 
     vector->objectsCount--;
     void *lastObjectPointer = (void *)(((intptr_t) vector->objects) + (vector->objectsCount * vector->objectSize));
     memcpy(outputObject, lastObjectPointer, vector->objectSize);
 
-    return true;
+    return True;
 }
 
 static void* get(struct NVector* vector, int32_t index) {
@@ -72,10 +78,16 @@ static void* get(struct NVector* vector, int32_t index) {
     return (void *)(((intptr_t) vector->objects) + (index * vector->objectSize));
 }
 
+static int32_t size(struct NVector* vector) {
+    return vector->objectsCount;
+}
+
 const struct NVector_Interface NVector = {
     .create = create,
-    .free = freeVector,
+    .createInHeap = createInHeap,
+    .destroy = destroy,
     .pushBack = pushBack,
     .popBack = popBack,
-    .get = get
+    .get = get,
+    .size = size
 };
