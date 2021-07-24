@@ -5,8 +5,8 @@
 
 // Note: this is a generic (slow) implementation. A specialized implementation for 32bit integers
 // is thus highly recommended. This can be achieved while maintaining high performance by creating
-// a new set of functions and a different instance of the NVector_Interface to handle the 32bit
-// specialized case. For example, NVector32.
+// a new set of functions and a different interface to handle the 32bit specialized case. For
+// example, NByteVector and NVector32.
 
 #pragma once
 
@@ -21,8 +21,8 @@ struct NVector_Interface {
     struct NVector* (*create)(int32_t initialCapacity, int32_t objectSize, struct NVector* outputVector);
     struct NVector* (*createInHeap)(int32_t initialCapacity, int32_t objectSize);
     void (*destroy)(struct NVector* vector);
-    boolean (*pushBack)(struct NVector* vector, const void *object);
-    boolean (*popBack)(struct NVector* vector, void *outputObject);
+    boolean (*pushBack)(struct NVector* vector, const void *object);  // True if successful.
+    boolean (*popBack)(struct NVector* vector, void *outputObject);   // True if successful.
     void* (*get)(struct NVector* vector, int32_t index);
     int32_t (*size)(struct NVector* vector);
 };

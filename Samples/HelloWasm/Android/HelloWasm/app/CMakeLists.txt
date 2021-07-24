@@ -14,7 +14,8 @@ set(SRC
         ../../../../../Src/Backends/Android/Cpp/NativeInterface.cpp
         ../../../../../Src/WasmMachine.c
         ../../../../../Src/ReferenceMachine.c
-        ../../../../../Src/Vector.c)
+        ../../../../../Src/Vector.c
+        ../../../../../Src/ByteVector.c)
 
 add_library( # Sets the name of the library.
              WasmMachine

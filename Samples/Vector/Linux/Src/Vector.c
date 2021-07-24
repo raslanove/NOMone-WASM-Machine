@@ -23,14 +23,14 @@ void main(void) {
 
     value = -1;
     NVector.popBack(vector, &value);
-    printf("Poped. Expecting 3, got: %d\n", value);
+    printf("Popped. Expecting 3, got: %d\n", value);
     
     printf("Get(0): %d\n", *(int *) NVector.get(vector, 0));
     printf("Get(1): %d\n", *(int *) NVector.get(vector, 1));
     printf("Get(2): %d\n", *(int *) NVector.get(vector, 2));
  
     printf("Capacity. Expecting 4, got: %d\n", vector->capacity);
-    printf("Objects count. Expecting 3, got: %d\n", vector->objectsCount);
+    printf("Size. Expecting 3, got: %d\n", vector->objectsCount);
  
     NVector.destroy(vector);
     free(vector);

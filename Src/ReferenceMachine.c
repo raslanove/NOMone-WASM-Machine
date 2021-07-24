@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <WasmMachine.h>
 #include <ReferenceMachine.h>
+#include <WasmMachine.h>
 
 static void NWM_destroyReferenceMachine(struct NWM_WasmMachine *machine) {
     machine->alive = False;
