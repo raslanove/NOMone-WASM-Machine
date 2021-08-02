@@ -8,9 +8,10 @@ public class WasmMachineNatives {
 
     public static int createReferenceMachine() { return nativeCreateReferenceMachine(); }
     public static void destroyMachine(int machineIndex) { nativeDestroyMachine(machineIndex); }
-    public static String compileWasmToBites(int machineIndex, String watCode) { return nativeCompileWasmToBites(machineIndex, watCode); }
+    public static boolean parseWatCode(int machineIndex, String watCode) { return nativeParseWatCode(machineIndex, watCode); }
 
-    private static native String nativeCompileWasmToBites(int machineIndex, String watCode);
+
+    private static native boolean nativeParseWatCode(int machineIndex, String watCode);
     private static native int nativeCreateReferenceMachine();
     private static native void nativeDestroyMachine(int machineIndex);
 }

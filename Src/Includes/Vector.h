@@ -12,10 +12,7 @@
 
 #include <stdint.h>
 
-#ifndef BOOL
-#define BOOL
-typedef enum { False=0, True=1 } boolean;
-#endif
+#include <NTypes.h>
 
 struct NVector_Interface {
     struct NVector* (*create)(int32_t initialCapacity, int32_t objectSize, struct NVector* outputVector);

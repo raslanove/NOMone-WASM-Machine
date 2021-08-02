@@ -1,20 +1,43 @@
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
+#include <memory.h>
 
 #include <ReferenceMachine.h>
+
 #include <WasmMachine.h>
+#include <ByteVector.h>
+#include <NString.h>
+
+struct ParsingStructure {
+    struct NWM_WasmMachine *machine;
+    const char* watCode;
+};
+
+static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t watCodeByteIndex);
 
 static void NWM_destroyReferenceMachine(struct NWM_WasmMachine *machine) {
     machine->alive = False;
 }
 
-static char* compileWasmToBites(struct NWM_WasmMachine *machine, const char* watCode) {
+static boolean parseWatCode(struct NWM_WasmMachine *machine, const char* watCode) {
 
-    // Just echo for now,
-    char* value = malloc(strlen(watCode)+1);
-    sprintf(value, "%s", watCode);
-    return value;
+    // Start parsing (recursive descent),
+    struct ParsingStructure parsingStructure;
+    parsingStructure.machine = machine;
+    parsingStructure.watCode = watCode;
+
+    boolean success = parseModule(&parsingStructure, 0);
+
+    return success;
+}
+
+static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t watCodeByteIndex) {
+
+    // Parse,
+    if (!NString.startsWith(&(parsingStructure->watCode[watCodeByteIndex]), "(module")) return False;
+
+    printf("yay!");
+    return True;
 }
 
 struct NWM_WasmMachine *NWM_createReferenceWasmMachine(struct NWM_WasmMachine *outputMachine) {
@@ -23,7 +46,7 @@ struct NWM_WasmMachine *NWM_createReferenceWasmMachine(struct NWM_WasmMachine *o
 
     outputMachine->alive = True;
     outputMachine->destroy = NWM_destroyReferenceMachine;
-    outputMachine->compileWasmToBites = compileWasmToBites;
+    outputMachine->parseWatCode = parseWatCode;
 
     return outputMachine;
 }

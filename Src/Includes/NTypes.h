@@ -1,0 +1,11 @@
+
+//////////////////////////////////////////////////////
+// Created by Omar El Sayyed on 26th of July 2021.
+//////////////////////////////////////////////////////
+
+#pragma once
+
+#ifndef BOOL
+#define BOOL
+typedef enum { False=0, True=1 } boolean;
+#endif

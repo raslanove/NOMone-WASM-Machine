@@ -15,7 +15,8 @@ set(SRC
         ../../../../../Src/WasmMachine.c
         ../../../../../Src/ReferenceMachine.c
         ../../../../../Src/Vector.c
-        ../../../../../Src/ByteVector.c)
+        ../../../../../Src/ByteVector.c
+        ../../../../../Src/NString.c)
 
 add_library( # Sets the name of the library.
              WasmMachine

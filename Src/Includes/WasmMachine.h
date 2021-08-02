@@ -1,14 +1,11 @@
 #pragma once
 
-#ifndef BOOL
-#define BOOL
-typedef enum { False=0, True=1 } boolean;
-#endif
+#include <NTypes.h>
 
 struct NWM_WasmMachine {
     boolean alive;
     void (*destroy)(struct NWM_WasmMachine *machine);
-    char* (*compileWasmToBites)(struct NWM_WasmMachine *machine, const char *watCode);
+    boolean (*parseWatCode)(struct NWM_WasmMachine *machine, const char *watCode);
 };
 
 struct NWM_Interface {    // NOMone Wasm Machine.

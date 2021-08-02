@@ -6,14 +6,12 @@
 
 void main(void) {
 
-    char watCode[] = "besm Allah AlRa7maan AlRa7eem :)";
-    char *biteCode;
-    
+    char watCode[] = "(module)";
+
     struct NWM_WasmMachine* machine = NWM.createReferenceWasmMachineInHeap();
-    biteCode = machine->compileWasmToBites(machine, watCode);
+    boolean result = machine->parseWatCode(machine, watCode);
     machine->destroy(machine);
     free(machine);
     
-    printf("%s\n", biteCode);
-    free(biteCode);
+    printf("%d\n", result);
 }

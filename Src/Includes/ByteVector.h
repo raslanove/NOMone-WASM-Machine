@@ -7,10 +7,7 @@
 
 #include <stdint.h>
 
-#ifndef BOOL
-#define BOOL
-typedef enum { False=0, True=1 } boolean;
-#endif
+#include <NTypes.h>
 
 struct NByteVector_Interface {
     struct NByteVector* (*create)(int32_t initialCapacity, struct NByteVector* outputVector);

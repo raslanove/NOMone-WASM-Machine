@@ -17,17 +17,15 @@ static struct NWM_WasmMachine* getMachine(int32_t index) {
     return (NWM_WasmMachine *) NVector.get(&machines, index);
 }
 
-JNI_CALL_PREFIX jstring JNICALL JNI_FUNCTION_NAME_PREFIX(nativeCompileWasmToBites)(JNI_FUNCTION_SIGNATURE_PREFIX, int32_t machineIndex, jstring watCode) {
+JNI_CALL_PREFIX jboolean JNICALL JNI_FUNCTION_NAME_PREFIX(nativeParseWatCode)(JNI_FUNCTION_SIGNATURE_PREFIX, int32_t machineIndex, jstring watCode) {
 
     NWM_WasmMachine *machine = getMachine(machineIndex);
 
     const char* nativeString = env->GetStringUTFChars(watCode, 0);
-    char* biteCode = machine->compileWasmToBites(machine, nativeString);
+    boolean success = machine->parseWatCode(machine, nativeString);
     env->ReleaseStringUTFChars(watCode, nativeString);
-    jstring returnString = env->NewStringUTF(biteCode);
-    delete biteCode;
 
-    return returnString;
+    return success;
 }
 
 JNI_CALL_PREFIX int JNICALL JNI_FUNCTION_NAME_PREFIX(nativeCreateReferenceMachine)(JNI_FUNCTION_SIGNATURE_PREFIX) {
