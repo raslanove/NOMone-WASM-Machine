@@ -1,0 +1,3 @@
+clear
+make
+./HelloWasm.o
