@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <stdint.h>
-
 #include <NTypes.h>
 
 struct NByteVector_Interface {

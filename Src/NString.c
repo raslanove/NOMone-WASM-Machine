@@ -1,8 +1,6 @@
 
 #include <NString.h>
 
-#include <stdint.h>
-
 static boolean startsWith(const char* string, const char* value) {
 
     int32_t index=0;
@@ -13,6 +11,20 @@ static boolean startsWith(const char* string, const char* value) {
     return True;
 }
 
+static char* copy(char* destination, const char* source) {
+
+    int32_t index=0;
+    char currentChar;
+    do {
+        currentChar = source[index];
+        destination[index] = currentChar;
+        index++;
+    } while (currentChar);
+
+    return destination;
+}
+
 const struct NString_Interface NString = {
-    .startsWith = startsWith
+    .startsWith = startsWith,
+    .copy = copy
 };

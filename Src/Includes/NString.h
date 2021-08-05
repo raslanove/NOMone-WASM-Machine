@@ -9,6 +9,7 @@
 
 struct NString_Interface {
     boolean (*startsWith)(const char* string, const char* value);  // True if successful.
+    char* (*copy)(char* destination, const char* source); // Returns destination.
 };
 
 extern const struct NString_Interface NString;

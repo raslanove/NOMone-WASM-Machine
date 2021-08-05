@@ -1,4 +1,3 @@
-#include <stdint.h>
 
 #include <WasmMachine.h>
 #include <ReferenceMachine.h>

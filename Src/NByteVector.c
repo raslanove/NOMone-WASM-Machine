@@ -1,7 +1,7 @@
-#include <stdlib.h>
 #include <string.h>
 
-#include <ByteVector.h>
+#include <NByteVector.h>
+#include <NSystemUtils.h>
 
 #define NBYTEVECTOR_BOUNDARY_CHECK 1
 
@@ -14,35 +14,36 @@ static struct NByteVector* create(int32_t initialCapacity,struct NByteVector* ou
     outputVector->capacity = initialCapacity;
     outputVector->size = 0;
 
-    if (initialCapacity > 0) outputVector->objects = malloc(initialCapacity);
+    if (initialCapacity > 0) outputVector->objects = NSystemUtils.malloc(initialCapacity);
 
     return outputVector;
 }
 
 static struct NByteVector* createInHeap(int32_t initialCapacity) {
-    struct NByteVector* vector = malloc(sizeof(struct NByteVector));;
+    struct NByteVector* vector = NSystemUtils.malloc(sizeof(struct NByteVector));;
     return create(initialCapacity, vector);
 }
 
 static void destroy(struct NByteVector* vector) {
-    free(vector->objects);
+    NSystemUtils.free(vector->objects);
     memset(vector, 0, sizeof(struct NByteVector));
 }
 
 static boolean expand(struct NByteVector* vector) {
     if (vector->capacity == 0) {
-        vector->objects = malloc(4);    // It's a waste to allocate less than 1 word, this also makes
+        vector->objects = NSystemUtils.malloc(4);    // It's a waste to allocate less than 1 word, this also makes
                                         // sure we can push 32bits at a time.
         if (!vector->objects) return False;
         vector->capacity = 4;
     } else {
-        void *newArray = malloc(vector->capacity << 1);
+        void *newArray = NSystemUtils.malloc(vector->capacity << 1);
         if (!newArray) return False;
         memcpy(newArray, vector->objects, vector->capacity);
-        free(vector->objects);
+        NSystemUtils.free(vector->objects);
         vector->objects = newArray;
         vector->capacity <<= 1;
     }
+    return True;
 }
 
 static boolean pushBack(struct NByteVector* vector, char value) {

@@ -1,11 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <memory.h>
 
 #include <ReferenceMachine.h>
 
 #include <WasmMachine.h>
-#include <ByteVector.h>
+#include <NSystemUtils.h>
+#include <NByteVector.h>
 #include <NString.h>
 
 #define MAX_TOKEN_LENGTH 256
@@ -73,6 +71,7 @@ static int32_t getToken(const char* string, int32_t index, char* outputToken) {
         outputToken[outputIndex++] = byte;
         if (outputIndex == MAX_TOKEN_LENGTH) {
             // TODO: Trigger error condition...
+            // ...xxx
             outputToken[outputIndex] = 0;
             return index;
         }
@@ -95,9 +94,9 @@ static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t wa
     watCodeByteIndex += 7; // strlen("(module")
     watCodeByteIndex = skipWhiteSpaces(parsingStructure->watCode, watCodeByteIndex);
 
-    //
-    // Skip white spaces,
-    printf("yay!");
+    // ...xxx
+
+    NLOG("yay!");
     return True;
 }
 
@@ -107,7 +106,7 @@ static boolean parseModuleExpression(struct ParsingStructure* parsingStructure, 
 
 struct NWM_WasmMachine *NWM_createReferenceWasmMachine(struct NWM_WasmMachine *outputMachine) {
 
-    memset(outputMachine, 0, sizeof(struct NWM_WasmMachine));
+    NSystemUtils.memset(outputMachine, 0, sizeof(struct NWM_WasmMachine));
 
     outputMachine->alive = True;
     outputMachine->destroy = NWM_destroyReferenceMachine;
@@ -117,6 +116,6 @@ struct NWM_WasmMachine *NWM_createReferenceWasmMachine(struct NWM_WasmMachine *o
 }
 
 struct NWM_WasmMachine *NWM_createReferenceWasmMachineInHeap() {
-    struct NWM_WasmMachine* machine = malloc(sizeof(struct NWM_WasmMachine));
+    struct NWM_WasmMachine* machine = NSystemUtils.malloc(sizeof(struct NWM_WasmMachine));
     return NWM_createReferenceWasmMachine(machine);
 }

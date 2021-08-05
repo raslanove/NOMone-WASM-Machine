@@ -14,7 +14,7 @@ SOURCES = \
 
 OBJECTS = $(SOURCES:.c=.o)
 
-TARGET = HelloWasm.o
+TARGET = Time.o
 
 # Targets start here.
 all: $(TARGET)

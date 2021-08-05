@@ -10,13 +10,12 @@ cmake_minimum_required(VERSION 3.4.1)
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
+FILE(GLOB CommonCFiles ../../../../../Src/*.c)
+
 set(SRC
         ../../../../../Src/Backends/Android/Cpp/NativeInterface.cpp
-        ../../../../../Src/WasmMachine.c
-        ../../../../../Src/ReferenceMachine.c
-        ../../../../../Src/Vector.c
-        ../../../../../Src/ByteVector.c
-        ../../../../../Src/NString.c)
+        ../../../../../Src/Backends/Android/Cpp/NSystemUtils.c
+        ${CommonCFiles})
 
 add_library( # Sets the name of the library.
              WasmMachine

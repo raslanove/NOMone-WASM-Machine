@@ -2,7 +2,7 @@
 
 extern "C" {
     #include <WasmMachine.h>
-    #include <Vector.h>
+    #include <NVector.h>
 };
 
 static boolean initialized=False;

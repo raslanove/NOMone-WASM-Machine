@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #ifndef BOOL
 #define BOOL
 typedef enum { False=0, True=1 } boolean;

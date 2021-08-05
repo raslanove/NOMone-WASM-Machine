@@ -10,19 +10,7 @@
 
 #pragma once
 
-#include <stdint.h>
-
 #include <NTypes.h>
-
-struct NVector_Interface {
-    struct NVector* (*create)(int32_t initialCapacity, int32_t objectSize, struct NVector* outputVector);
-    struct NVector* (*createInHeap)(int32_t initialCapacity, int32_t objectSize);
-    void (*destroy)(struct NVector* vector);
-    boolean (*pushBack)(struct NVector* vector, const void *object);  // True if successful.
-    boolean (*popBack)(struct NVector* vector, void *outputObject);   // True if successful.
-    void* (*get)(struct NVector* vector, int32_t index);
-    int32_t (*size)(struct NVector* vector);
-};
 
 struct NVector {
     // DON'T OVERWRITE. For use by the provided functions only.
@@ -30,6 +18,17 @@ struct NVector {
     int32_t objectSize;
     int32_t objectsCount;
     void* objects;
+};
+
+struct NVector_Interface {
+    struct NVector* (*create)(int32_t initialCapacity, int32_t objectSize, struct NVector* outputVector);
+    struct NVector* (*createInHeap)(int32_t initialCapacity, int32_t objectSize);
+    void (*destroy)(struct NVector* vector);
+    void* (*emplaceBack)(struct NVector* vector);  // New structure pointer if successful, 0 otherwise.
+    boolean (*pushBack)(struct NVector* vector, const void *object);  // True if successful.
+    boolean (*popBack)(struct NVector* vector, void *outputObject);   // True if successful.
+    void* (*get)(struct NVector* vector, int32_t index);
+    int32_t (*size)(struct NVector* vector);
 };
 
 extern const struct NVector_Interface NVector;
