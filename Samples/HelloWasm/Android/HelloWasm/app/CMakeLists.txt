@@ -10,11 +10,11 @@ cmake_minimum_required(VERSION 3.4.1)
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
-FILE(GLOB CommonCFiles ../../../../../Src/*.c)
+FILE(GLOB AndroidCPPFiles ../../../../../Src/Backends/Android/Cpp/*.cpp)
+FILE(GLOB    CommonCFiles ../../../../../Src/*.c)
 
 set(SRC
-        ../../../../../Src/Backends/Android/Cpp/NativeInterface.cpp
-        ../../../../../Src/Backends/Android/Cpp/NSystemUtils.c
+        ${AndroidCPPFiles}
         ${CommonCFiles})
 
 add_library( # Sets the name of the library.

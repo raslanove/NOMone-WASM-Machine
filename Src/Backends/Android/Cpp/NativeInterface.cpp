@@ -1,9 +1,7 @@
 #include "Includes/NativeInterface.h"
 
-extern "C" {
-    #include <WasmMachine.h>
-    #include <NVector.h>
-};
+#include <WasmMachine.h>
+#include <NVector.h>
 
 static boolean initialized=False;
 static struct NVector machines;

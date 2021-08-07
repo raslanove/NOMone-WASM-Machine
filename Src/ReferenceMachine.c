@@ -4,7 +4,8 @@
 #include <WasmMachine.h>
 #include <NSystemUtils.h>
 #include <NByteVector.h>
-#include <NString.h>
+#include <NCString.h>
+#include <NError.h>
 
 #define MAX_TOKEN_LENGTH 256
 #define INLINE inline
@@ -70,8 +71,8 @@ static int32_t getToken(const char* string, int32_t index, char* outputToken) {
     while (byte && !isWhiteSpace(byte) && !isOneByteToken(byte)) {
         outputToken[outputIndex++] = byte;
         if (outputIndex == MAX_TOKEN_LENGTH) {
-            // TODO: Trigger error condition...
-            // ...xxx
+            // TODO: ...xxx
+            //NERROR("TOKEN exceeded maximum length: %s", outputToken);
             outputToken[outputIndex] = 0;
             return index;
         }
@@ -88,7 +89,7 @@ static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t wa
     char token[MAX_TOKEN_LENGTH];
     watCodeByteIndex = getToken(parsingStructure->watCode, watCodeByteIndex, token);
     // TODO: check for open parenthesis...
-    if (!NString.startsWith(&(parsingStructure->watCode[watCodeByteIndex]), "module")) return False;
+    if (!NCString.startsWith(&(parsingStructure->watCode[watCodeByteIndex]), "module")) return False;
 
     // Advance the wat byte index,
     watCodeByteIndex += 7; // strlen("(module")
@@ -96,7 +97,7 @@ static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t wa
 
     // ...xxx
 
-    NLOG("yay!");
+    NLOGI("Ref machine", "yay!");
     return True;
 }
 

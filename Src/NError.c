@@ -1,7 +1,7 @@
 #include <NError.h>
 #include <NVector.h>
 #include <NSystemUtils.h>
-#include <NString.h>
+#include <NCString.h>
 
 static struct NVector* errorsStack;
 
@@ -25,19 +25,19 @@ static struct NError* pushError(const char* errorMessage) {
 
     // Create a new error in the stack,
     struct NError* newError = (struct NError*) NVector.emplaceBack(errorsStack);
-    NString.copy(newError->message, errorMessage);
+    NCString.copy(newError->message, errorMessage);
     NTime.getTime(&(newError->time));
 
     return newError;
 }
 
-static struct NError* pushAndPrintError(const char* errorMessage) {
+static struct NError* pushAndPrintError(const char* tag, const char* errorMessage) {
     struct NError *error = pushError(errorMessage);
-    NSystemUtils.log(error->message);
+    NSystemUtils.logE(tag, error->message);
     return error;
 }
 
-static struct NVector* getObservationResult(int32_t stackPosition) {
+static struct NVector* popErrors(int32_t stackPosition) {
     if (!errorsStack) return 0;
 
     // TODO:....
@@ -48,5 +48,6 @@ const struct NError_Interface NError = {
     .terminate = terminate,
     .observeErrors = observeErrors,
     .pushError = pushError,
-    .getObservationResult = getObservationResult
+    .pushAndPrintError = pushAndPrintError,
+    .popErrors = popErrors
 };

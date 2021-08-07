@@ -2,7 +2,7 @@
 #include <WasmMachine.h>
 #include <NSystemUtils.h>
 
-void main(void) {
+void NMain(void) {
 
     char watCode[] = "(module)";
     

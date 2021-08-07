@@ -1,30 +1,21 @@
 
 #include <NString.h>
 
-static boolean startsWith(const char* string, const char* value) {
 
-    int32_t index=0;
-    while (value[index]) {
-        if (string[index] != value[index]) return False;
-        index++;
-    }
-    return True;
+static struct NString* initialize(struct NString* outputString) {
+    NByteVector.create(0, &(outputString->string));
 }
 
-static char* copy(char* destination, const char* source) {
+static void destroy(struct NString* outputString) {
+    NByteVector.destroy(&(outputString->string));
+}
 
-    int32_t index=0;
-    char currentChar;
-    do {
-        currentChar = source[index];
-        destination[index] = currentChar;
-        index++;
-    } while (currentChar);
-
-    return destination;
+static struct NString* create(const char* format, ...) {
+    // TODO: ...xxx
 }
 
 const struct NString_Interface NString = {
-    .startsWith = startsWith,
-    .copy = copy
+    .initialize = initialize,
+    .destroy = destroy,
+    .create = create
 };

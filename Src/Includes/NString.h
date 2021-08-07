@@ -5,11 +5,16 @@
 
 #pragma once
 
-#include <NTypes.h>
+#include <NByteVector.h>
+
+struct NString {
+    struct NByteVector string;
+};
 
 struct NString_Interface {
-    boolean (*startsWith)(const char* string, const char* value);  // True if successful.
-    char* (*copy)(char* destination, const char* source); // Returns destination.
+    struct NString* (*initialize)(struct NString* outputString);
+    void (*destroy)(struct NString* outputString);
+    struct NString* (*create)(const char* format, ...);
 };
 
 extern const struct NString_Interface NString;

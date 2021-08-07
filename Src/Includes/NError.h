@@ -19,8 +19,8 @@ struct NError_Interface {
     void (*terminate)();  // Call once at the program end.
     int32_t (*observeErrors)();  // Returns current position in error stack.
     struct NError* (*pushError)(const char* errorMessage);
-    struct NError* (*pushAndPrintError)(const char* errorMessage);
-    struct NVector* (*getObservationResult)(int32_t stackPosition);  // 0 if no error occurred since then, a vector of NErrors otherwise.
+    struct NError* (*pushAndPrintError)(const char* tag, const char* errorMessage);
+    struct NVector* (*popErrors)(int32_t stackPosition);  // 0 if no error occurred since then, a vector of NErrors otherwise.
 };
 
 extern const struct NError_Interface NError;
