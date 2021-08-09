@@ -1,7 +1,7 @@
 
 LINKER_FLAGS = 
 
-CFLAGS = -I../../../Src/Includes/ -DDESKTOP -g -MMD # g=>generate debug info. MMD=>generate dependency files.
+CFLAGS = -I../../../Src/Includes/ -DDESKTOP -g -MMD# g=>generate debug info. MMD=>generate dependency files.
 
 # Optimization flags,
 #CFLAGS += -s -O3 -fdata-sections -ffunction-sections 
@@ -9,7 +9,8 @@ CFLAGS = -I../../../Src/Includes/ -DDESKTOP -g -MMD # g=>generate debug info. MM
 
 SOURCES = \
 	$(wildcard ../../../Src/*.c) \
-	$(wildcard Src/*.c) \
+	$(wildcard ../../../Src/Backends/Linux/*.c) \
+	$(wildcard ../Src/*.c) \
 
 OBJECTS = $(SOURCES:.c=.o)
 

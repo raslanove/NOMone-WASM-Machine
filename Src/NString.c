@@ -1,7 +1,6 @@
 
 #include <NString.h>
 #include <NError.h>
-#include <NVarArgs.h>
 #include <NSystemUtils.h>
 
 static struct NString* initialize(struct NString* outputString) {
@@ -10,11 +9,16 @@ static struct NString* initialize(struct NString* outputString) {
     return outputString;
 }
 
-static void destroy(struct NString* outputString) {
-    NByteVector.destroy(&(outputString->string));
+static void destroy(struct NString* string) {
+    NByteVector.destroy(&(string->string));
 }
 
-static inline struct NString* vAppend(struct NString* outString, const char* format, va_list vaList) {
+static void destroyAndFree(struct NString* string) {
+    NByteVector.destroy(&(string->string));
+    NSystemUtils.free(string);
+}
+
+static struct NString* vAppend(struct NString* outString, const char* format, va_list vaList) {
 
     // Pop the termination zero,
     struct NByteVector *outVector = &outString->string;
@@ -46,6 +50,7 @@ static inline struct NString* vAppend(struct NString* outString, const char* for
             }
             continue;
             default:
+                // TODO: correct ...xxx
                 NError.pushAndPrintError("NString.vAppend", "Unexpected sequence");
                 //NError.pushAndPrintError("NString.vAppend", "Unexpected sequence at index %d", index);
                 goto exit;
@@ -93,11 +98,18 @@ static struct NString* create(const char* format, ...) {
     return outString;
 }
 
+static int32_t length(struct NString* string) {
+    return string->string.size - 1;
+}
+
 const struct NString_Interface NString = {
     .initialize = initialize,
     .destroy = destroy,
+    .destroyAndFree = destroyAndFree,
+    .vAppend = vAppend,
     .append = append,
     .set = set,
     .get = get,
-    .create = create
+    .create = create,
+    .length = length
 };

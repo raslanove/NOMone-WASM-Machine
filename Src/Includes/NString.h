@@ -6,6 +6,7 @@
 #pragma once
 
 #include <NByteVector.h>
+#include <NVarArgs.h>
 
 struct NString {
     struct NByteVector string;
@@ -13,12 +14,15 @@ struct NString {
 
 struct NString_Interface {
     struct NString* (*initialize)(struct NString* outputString);
-    void (*destroy)(struct NString* outputString);
+    void (*destroy)(struct NString* string);
+    void (*destroyAndFree)(struct NString* string);
 
+    struct NString* (*vAppend)(struct NString* outString, const char* format, va_list vaList);
     struct NString* (*append)(struct NString* outString, const char* format, ...);
     struct NString* (*set)(struct NString* outString, const char* format, ...);
     const char* (*get)(struct NString* string);
     struct NString* (*create)(const char* format, ...);
+    int32_t (*length)(struct NString* string);
 };
 
 extern const struct NString_Interface NString;

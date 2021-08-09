@@ -14,7 +14,7 @@ SOURCES = \
 
 OBJECTS = $(SOURCES:.c=.o)
 
-TARGET = Vector.o
+TARGET = String.o
 
 # Targets start here.
 all: $(TARGET)

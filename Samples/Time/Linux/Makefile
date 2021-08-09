@@ -10,7 +10,7 @@ CFLAGS = -I../../../Src/Includes/ -DDESKTOP -g -MMD# g=>generate debug info. MMD
 SOURCES = \
 	$(wildcard ../../../Src/*.c) \
 	$(wildcard ../../../Src/Backends/Linux/*.c) \
-	$(wildcard Src/*.c) \
+	$(wildcard ../Src/*.c) \
 
 OBJECTS = $(SOURCES:.c=.o)
 

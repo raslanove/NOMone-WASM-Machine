@@ -71,8 +71,7 @@ static int32_t getToken(const char* string, int32_t index, char* outputToken) {
     while (byte && !isWhiteSpace(byte) && !isOneByteToken(byte)) {
         outputToken[outputIndex++] = byte;
         if (outputIndex == MAX_TOKEN_LENGTH) {
-            // TODO: ...xxx
-            //NERROR("TOKEN exceeded maximum length: %s", outputToken);
+            NERROR("ReferenceMachine", "TOKEN exceeded maximum length: %s", outputToken);
             outputToken[outputIndex] = 0;
             return index;
         }
