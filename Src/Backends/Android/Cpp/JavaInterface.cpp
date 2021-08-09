@@ -6,6 +6,8 @@ static const char packageName[] = NATIVES_CLASS;
 static JavaVM *currentJvm=0;
 static jclass interfaceClass;
 
+extern "C" void NMain();
+
 class JniState {
     bool shouldDetachThread;
 public:

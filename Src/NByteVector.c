@@ -29,6 +29,11 @@ static void destroy(struct NByteVector* vector) {
     memset(vector, 0, sizeof(struct NByteVector));
 }
 
+static struct NByteVector* clear(struct NByteVector* vector) {
+    vector->size = 0;
+    return vector;
+}
+
 static boolean expand(struct NByteVector* vector) {
     if (vector->capacity == 0) {
         vector->objects = NSystemUtils.malloc(4);    // It's a waste to allocate less than 1 word, this also makes
@@ -99,6 +104,7 @@ const struct NByteVector_Interface NByteVector = {
     .create = create,
     .createInHeap = createInHeap,
     .destroy = destroy,
+    .clear = clear,
     .pushBack = pushBack,
     .popBack = popBack,
     .pushBack32Bit = pushBack32Bit,

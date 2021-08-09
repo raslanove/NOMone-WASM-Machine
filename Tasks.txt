@@ -1,0 +1,3 @@
+- All create should be renamed into initialize (except NString).
+- All createInHeap should be renamed to create.
+

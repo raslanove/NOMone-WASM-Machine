@@ -15,14 +15,19 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
         TextView textView = findViewById(R.id.hello_textView);
+        textView.setText("Please check you logcat!");
 
         try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
+        WasmMachineNatives.start();
+
+        /*
         int machineIndex = WasmMachineNatives.createReferenceMachine();
         boolean result = WasmMachineNatives.parseWatCode(machineIndex, "(module)");
         textView.setText("" + result);
         WasmMachineNatives.destroyMachine(machineIndex);
 
         try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
+        */
     }
 }

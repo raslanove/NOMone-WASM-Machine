@@ -14,6 +14,10 @@ struct NString {
 struct NString_Interface {
     struct NString* (*initialize)(struct NString* outputString);
     void (*destroy)(struct NString* outputString);
+
+    struct NString* (*append)(struct NString* outString, const char* format, ...);
+    struct NString* (*set)(struct NString* outString, const char* format, ...);
+    const char* (*get)(struct NString* string);
     struct NString* (*create)(const char* format, ...);
 };
 

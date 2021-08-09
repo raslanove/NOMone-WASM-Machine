@@ -43,6 +43,8 @@ static void nLog(const char *tag, const char* format, ...) {
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
+    
+    printf("\n");
 }
 
 static void getTime(int64_t* outTimeSeconds, int64_t* outTimeNanos) {
