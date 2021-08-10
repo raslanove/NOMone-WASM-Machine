@@ -22,6 +22,7 @@ struct NError_Interface {
     struct NError* (*pushError)(const char* errorMessageFormat, ...);
     struct NError* (*pushAndPrintError)(const char* tag, const char* errorMessageFormat, ...);
     struct NVector* (*popErrors)(int32_t stackPosition);  // 0 if no error occurred since then, a vector of NErrors otherwise.
+    int32_t (*popDestroyAndFreeErrors)(int32_t stackPosition);
 };
 
 extern const struct NError_Interface NError;

@@ -66,8 +66,28 @@ static struct NError* pushAndPrintError(const char* tag, const char* errorMessag
 static struct NVector* popErrors(int32_t stackPosition) {
     if (!errorsStack) return 0;
 
-    // TODO:....
-    // ...xxx
+    // If no errors, return immediately,
+    int32_t errorsCount = NVector.size(errorsStack) - stackPosition;
+    if (errorsCount <= 0) return 0;
+
+    // Pop the errors and return them,
+    struct NVector* errors = NVector.createInHeap(errorsCount, sizeof(struct NError));
+    for (int32_t i=0; i<errorsCount; i++) {
+        NVector.emplaceBack(errors);
+        NVector.popBack(errorsStack, NVector.get(errors, i));
+    }
+
+    return errors;
+}
+
+static int32_t popDestroyAndFreeErrors(int32_t stackPosition) {
+    struct NVector* errors = popErrors(stackPosition);
+    if (!errors) return 0;
+
+    int32_t errorsCount = NVector.size(errors);
+    NVector.destroy(errors);
+    NSystemUtils.free(errors);
+    return errorsCount;
 }
 
 const struct NError_Interface NError = {
@@ -75,5 +95,6 @@ const struct NError_Interface NError = {
     .observeErrors = observeErrors,
     .pushError = pushError,
     .pushAndPrintError = pushAndPrintError,
-    .popErrors = popErrors
+    .popErrors = popErrors,
+    .popDestroyAndFreeErrors = popDestroyAndFreeErrors
 };

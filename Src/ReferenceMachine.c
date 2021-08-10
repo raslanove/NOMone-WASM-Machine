@@ -10,6 +10,8 @@
 #define MAX_TOKEN_LENGTH 256
 #define INLINE inline
 
+#define LOG_TAG "Ref machine"
+
 struct ParsingStructure {
     struct NWM_WasmMachine *machine;
     const char* watCode;
@@ -71,7 +73,7 @@ static int32_t getToken(const char* string, int32_t index, char* outputToken) {
     while (byte && !isWhiteSpace(byte) && !isOneByteToken(byte)) {
         outputToken[outputIndex++] = byte;
         if (outputIndex == MAX_TOKEN_LENGTH) {
-            NERROR("ReferenceMachine", "TOKEN exceeded maximum length: %s", outputToken);
+            NERROR(LOG_TAG, "TOKEN exceeded maximum length: %s", outputToken);
             outputToken[outputIndex] = 0;
             return index;
         }
@@ -96,7 +98,7 @@ static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t wa
 
     // ...xxx
 
-    NLOGI("Ref machine", "yay!");
+    NLOGI(LOG_TAG, "yay!");
     return True;
 }
 
