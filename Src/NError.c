@@ -23,13 +23,12 @@ static int32_t observeErrors() {
 static struct NError* vPushError(const char* errorMessageFormat, va_list vaList) {
     if (!errorsStack) initialize();
 
-    // Create a new error in the stack,
-    struct NError* newError = (struct NError*) NVector.emplaceBack(errorsStack);
-
     // Create the error message,
     struct NString* errorMessageString = NString.create("");
     NString.vAppend(errorMessageString, errorMessageFormat, vaList);
 
+    // Create a new error in the stack,
+    struct NError* newError = (struct NError*) NVector.emplaceBack(errorsStack);
     int32_t messageLength = NString.length(errorMessageString);
     if (messageLength >= NERROR_MAX_MESSAGE_LENGTH) {
         NSystemUtils.memcpy(newError->message, NString.get(errorMessageString), NERROR_MAX_MESSAGE_LENGTH-1);
@@ -59,7 +58,7 @@ static struct NError* pushAndPrintError(const char* tag, const char* errorMessag
     struct NError* error = vPushError(errorMessageFormat, vaList);
     va_end(vaList);
 
-    NLOGE(tag, error->message);
+    NLOGE(tag, "%s", error->message);
     return error;
 }
 
@@ -80,13 +79,17 @@ static struct NVector* popErrors(int32_t stackPosition) {
     return errors;
 }
 
+static void destroyAndFreeErrors(struct NVector *errors) {
+    NVector.destroy(errors);
+    NSystemUtils.free(errors);
+}
+
 static int32_t popDestroyAndFreeErrors(int32_t stackPosition) {
     struct NVector* errors = popErrors(stackPosition);
     if (!errors) return 0;
 
     int32_t errorsCount = NVector.size(errors);
-    NVector.destroy(errors);
-    NSystemUtils.free(errors);
+    destroyAndFreeErrors(errors);
     return errorsCount;
 }
 
@@ -96,5 +99,6 @@ const struct NError_Interface NError = {
     .pushError = pushError,
     .pushAndPrintError = pushAndPrintError,
     .popErrors = popErrors,
+    .destroyAndFreeErrors = destroyAndFreeErrors,
     .popDestroyAndFreeErrors = popDestroyAndFreeErrors
 };

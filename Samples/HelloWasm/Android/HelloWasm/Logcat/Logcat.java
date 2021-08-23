@@ -229,9 +229,12 @@ public class Logcat {
         }
 
         // Continue parsing,
-        String       tag = line.substring(0, line.indexOf(':')); line = line.substring(line.indexOf(':')+1); line = line.trim();
+        String       tag = line.substring(0, line.indexOf(':')); line = line.substring(line.indexOf(':')+1);
 
-        // Because some tags have a trailing ":",
+        // Now let's process the message,
+        line = trimString(line); // Trim preserving ANSI escape codes for colors.
+
+        // Some tags have a trailing ":",
         if (line.startsWith(":")) {
             tag += ":";
             line = line.substring(1);
@@ -293,8 +296,7 @@ public class Logcat {
             for (int i=0; i<fields.length(); i++) paddedMessage = ' ' + paddedMessage;
 
             // Print,
-            print(paddedMessage, color);
-            System.out.println();
+            System.out.println(paddedMessage);
         }
 
         return true;  // Keep in local buffer.
@@ -342,7 +344,30 @@ public class Logcat {
     private static void print(String text, Color color) {
         System.out.print(color);
         System.out.print(text);
-        System.out.print(Color.RESET);
+    }
+
+    private static String trimString(String string) {
+
+        // Because the java provided String.trim() removes the ANSI escape codes
+        // ('\033' characters) which are necessary for coloring in ANSI-compatible
+        // terminals.
+        int textLength = string.length();
+
+        int frontTrimIndex=0;
+        for (; frontTrimIndex<textLength; frontTrimIndex++) {
+            char currentChar = string.charAt(frontTrimIndex);
+            if (currentChar==' ' || currentChar=='\t' || currentChar=='\n' || currentChar=='\r') continue;
+            break;
+        }
+
+        int backTrimIndex=textLength-1;
+        for (; backTrimIndex>-1; backTrimIndex--) {
+            char currentChar = string.charAt(backTrimIndex);
+            if (currentChar==' ' || currentChar=='\t' || currentChar=='\n' || currentChar=='\r') continue;
+            break;
+        }
+
+        return string.substring(frontTrimIndex, backTrimIndex+1);
     }
 
     private static String removeRedundantSpaces(String text) {

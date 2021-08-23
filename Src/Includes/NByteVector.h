@@ -24,6 +24,7 @@ struct NByteVector_Interface {
     boolean (*pushBack32Bit)(struct NByteVector* vector, int32_t value);
     boolean (*popBack32Bit)(struct NByteVector* vector, int32_t *output);
     char (*get)(struct NByteVector* vector, int32_t index);
+    boolean (*set)(struct NByteVector* vector, int32_t index, char value);
     int32_t (*size)(struct NByteVector* vector);
 };
 

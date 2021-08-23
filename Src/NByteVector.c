@@ -96,6 +96,16 @@ static char get(struct NByteVector* vector, int32_t index) {
     return vector->objects[index];
 }
 
+static boolean set(struct NByteVector* vector, int32_t index, char value) {
+#if NBYTEVECTOR_BOUNDARY_CHECK
+    // TODO: trigger some error condition...
+    if (index >= vector->size) return False;
+#endif
+
+    vector->objects[index] = value;
+    return True;
+}
+
 static int32_t size(struct NByteVector* vector) {
     return vector->size;
 }
@@ -110,5 +120,6 @@ const struct NByteVector_Interface NByteVector = {
     .pushBack32Bit = pushBack32Bit,
     .popBack32Bit = popBack32Bit,
     .get = get,
+    .set = set,
     .size = size
 };

@@ -1,5 +1,3 @@
-#include <string.h>
-
 #include <NVector.h>
 #include <NSystemUtils.h>
 
@@ -9,7 +7,7 @@ static struct NVector* create(int32_t initialCapacity, int32_t objectSize, struc
 
     if (objectSize==0) return 0;
 
-    memset(outputVector, 0, sizeof(struct NVector));
+    NSystemUtils.memset(outputVector, 0, sizeof(struct NVector));
 
     outputVector->capacity = initialCapacity;
     outputVector->objectSize = objectSize;
@@ -30,7 +28,7 @@ static struct NVector* createInHeap(int32_t initialCapacity, int32_t objectSize)
 
 static void destroy(struct NVector* vector) {
     NSystemUtils.free(vector->objects);
-    memset(vector, 0, sizeof(struct NVector));
+    NSystemUtils.memset(vector, 0, sizeof(struct NVector));
 }
 
 static boolean expand(struct NVector* vector) {
@@ -42,7 +40,7 @@ static boolean expand(struct NVector* vector) {
         int32_t originalSizeBytes = vector->capacity * vector->objectSize;
         void *newArray = NSystemUtils.malloc(originalSizeBytes << 1);
         if (!newArray) return False;
-        memcpy(newArray, vector->objects, originalSizeBytes);
+        NSystemUtils.memcpy(newArray, vector->objects, originalSizeBytes);
         NSystemUtils.free(vector->objects);
         vector->objects = newArray;
         vector->capacity <<= 1;
@@ -53,9 +51,9 @@ static boolean expand(struct NVector* vector) {
 static void* emplaceBack(struct NVector* vector) {
 
     // Double the vector capacity if needed,
-    if ((vector->objectsCount == vector->capacity) && !expand(vector)) return False;
+    if ((vector->objectsCount == vector->capacity) && !expand(vector)) return 0;
 
-    // Push the value,
+    // Make way for a new entry,
     void *newObjectPointer = (void *)(((intptr_t) vector->objects) + (vector->objectsCount * vector->objectSize));
     vector->objectsCount++;
 
@@ -69,7 +67,7 @@ static boolean pushBack(struct NVector* vector, const void *object) {
 
     // Push the value,
     void *newObjectPointer = (void *)(((intptr_t) vector->objects) + (vector->objectsCount * vector->objectSize));
-    memcpy(newObjectPointer, object, vector->objectSize);
+    NSystemUtils.memcpy(newObjectPointer, object, vector->objectSize);
     vector->objectsCount++;
 
     return True;
@@ -80,7 +78,7 @@ static boolean popBack(struct NVector* vector, void *outputObject) {
 
     vector->objectsCount--;
     void *lastObjectPointer = (void *)(((intptr_t) vector->objects) + (vector->objectsCount * vector->objectSize));
-    memcpy(outputObject, lastObjectPointer, vector->objectSize);
+    NSystemUtils.memcpy(outputObject, lastObjectPointer, vector->objectSize);
 
     return True;
 }
