@@ -26,6 +26,8 @@ struct NSystemUtils_Interface {
     void (*logW)(const char* tag, const char* format, ...);
     void (*logE)(const char* tag, const char* format, ...);
     void (*getTime)(int64_t* outTimeSeconds, int64_t* outTimeNanos);
+    boolean (*isNaN)(double value);
+    boolean (*isInf)(double value);
 };
 
 extern const struct NSystemUtils_Interface NSystemUtils;

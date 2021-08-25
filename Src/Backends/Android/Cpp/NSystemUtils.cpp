@@ -11,6 +11,7 @@
 #include <memory.h>
 #include <stdarg.h>
 #include <android/log.h>
+#include <math.h>
 
 static int64_t currentTime=0;
 
@@ -54,6 +55,9 @@ static void getTime(int64_t* outTimeSeconds, int64_t* outTimeNanos) {
     *outTimeNanos = 0;
 }
 
+static boolean isNaN(double value) { return (isnan(value) ? True : False); }
+static boolean isInf(double value) { return (isinf(value) ? True : False); }
+
 const struct NSystemUtils_Interface NSystemUtils = {
     .malloc = nMalloc,
     .free = nFree,
@@ -62,7 +66,9 @@ const struct NSystemUtils_Interface NSystemUtils = {
     .logI = logI,
     .logW = logW,
     .logE = logE,
-    .getTime = getTime
+    .getTime = getTime,
+    .isNaN = isNaN,
+    .isInf = isInf
 };
 
 const struct NTerminalColor NTerminalColor = {

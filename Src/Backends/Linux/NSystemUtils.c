@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 void NMain();
 
@@ -71,6 +72,9 @@ static void getTime(int64_t* outTimeSeconds, int64_t* outTimeNanos) {
     *outTimeNanos = time.tv_nsec;
 }
 
+static boolean isNaN(double value) { return isnan(value); }
+static boolean isInf(double value) { return isinf(value); }
+
 const struct NSystemUtils_Interface NSystemUtils = {
     .malloc = nMalloc,
     .free = nFree,
@@ -79,7 +83,9 @@ const struct NSystemUtils_Interface NSystemUtils = {
     .logI = nLogI,
     .logW = nLogW,
     .logE = nLogE,
-    .getTime = getTime
+    .getTime = getTime,
+    .isNaN = isNaN,
+    .isInf = isInf
 };
 
 const struct NTerminalColor NTerminalColor = {

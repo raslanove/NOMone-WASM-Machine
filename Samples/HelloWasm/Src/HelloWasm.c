@@ -1,8 +1,9 @@
-
 #include <WasmMachine.h>
 #include <NSystemUtils.h>
 #include <NError.h>
 #include <NVector.h>
+
+#include <stdio.h>
 
 void NMain() {
 
@@ -14,9 +15,8 @@ void NMain() {
     NSystemUtils.free(machine);
     NSystemUtils.logI("Test", "%s\n", (result==1 ? "True" : "False"));
 
-    NLOGW("dsfdsf", "abc %f", 1.23);
-
-    NERROR("Test", "Typing a char: %c%c%c %% %f", 'A', 'b', 'c');
+    NLOGI("Testing float", "%f" , 999999999999999.12345678);
+    printf("Testing float: %f\n", 999999999999999.12345678);
 
     // Check if any errors ended up without handling,
     struct NVector* errors = NError.popErrors(0);
