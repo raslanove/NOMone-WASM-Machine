@@ -41,7 +41,7 @@ static void* nMemcpy(void* dest, const void* src, int32_t length) {
     va_end(vaList); \
     if (!errorsCount) { \
         struct NString* coloredString = NString.replace(NString.get(formattedString), NTCOLOR(STREAM_DEFAULT), color); \
-        __android_log_print(logLevel, logTag, "%s%s%s", color, NString.get(coloredString), NTCOLOR(RESET)); \
+        __android_log_print(logLevel, logTag ? logTag : "", "%s%s%s", color, NString.get(coloredString), NTCOLOR(RESET)); \
         NString.destroyAndFree(coloredString); \
     } \
     NString.destroyAndFree(formattedString)

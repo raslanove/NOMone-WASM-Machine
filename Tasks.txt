@@ -1,3 +1,7 @@
 - All create should be renamed into initialize (except NString).
 - All createInHeap should be renamed to create.
-
+- Remove all unnecessary interfaces and use "__" instead of ".". For example:
+    instead of:
+      NError.terminate();
+    use:     
+      NError__terminate();

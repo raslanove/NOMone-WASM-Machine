@@ -31,6 +31,11 @@ static void destroy(struct NVector* vector) {
     NSystemUtils.memset(vector, 0, sizeof(struct NVector));
 }
 
+static void destroyAndFree(struct NVector* vector) {
+    destroy(vector);
+    NSystemUtils.free(vector);
+}
+
 static boolean expand(struct NVector* vector) {
     if (vector->capacity == 0) {
         vector->objects = NSystemUtils.malloc(vector->objectSize);
@@ -99,6 +104,7 @@ const struct NVector_Interface NVector = {
     .create = create,
     .createInHeap = createInHeap,
     .destroy = destroy,
+    .destroyAndFree = destroyAndFree,
     .emplaceBack = emplaceBack,
     .pushBack = pushBack,
     .popBack = popBack,

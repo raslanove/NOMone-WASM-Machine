@@ -1,13 +1,12 @@
-#include <string.h>
-
 #include <NByteVector.h>
 #include <NSystemUtils.h>
+#include <NError.h>
 
 #define NBYTEVECTOR_BOUNDARY_CHECK 1
 
 static struct NByteVector* create(int32_t initialCapacity,struct NByteVector* outputVector) {
 
-    memset(outputVector, 0, sizeof(struct NByteVector));
+    NSystemUtils.memset(outputVector, 0, sizeof(struct NByteVector));
 
     if ((initialCapacity>0) && (initialCapacity<4)) initialCapacity = 4; // Make sure that expands can accommodate a 32bit push.
 
@@ -26,7 +25,7 @@ static struct NByteVector* createInHeap(int32_t initialCapacity) {
 
 static void destroy(struct NByteVector* vector) {
     NSystemUtils.free(vector->objects);
-    memset(vector, 0, sizeof(struct NByteVector));
+    NSystemUtils.memset(vector, 0, sizeof(struct NByteVector));
 }
 
 static struct NByteVector* clear(struct NByteVector* vector) {
@@ -43,7 +42,7 @@ static boolean expand(struct NByteVector* vector) {
     } else {
         void *newArray = NSystemUtils.malloc(vector->capacity << 1);
         if (!newArray) return False;
-        memcpy(newArray, vector->objects, vector->capacity);
+        NSystemUtils.memcpy(newArray, vector->objects, vector->capacity);
         NSystemUtils.free(vector->objects);
         vector->objects = newArray;
         vector->capacity <<= 1;
@@ -89,8 +88,10 @@ static boolean popBack32Bit(struct NByteVector* vector, int32_t *output) {
 
 static char get(struct NByteVector* vector, int32_t index) {
 #if NBYTEVECTOR_BOUNDARY_CHECK
-    // TODO: trigger some error condition...
-    if (index >= vector->size) return 0;
+    if (index >= vector->size) {
+        NERROR("NByteVector.get()", "Index out of bound: %d", index);
+        return 0;
+    }
 #endif
 
     return vector->objects[index];
@@ -98,8 +99,10 @@ static char get(struct NByteVector* vector, int32_t index) {
 
 static boolean set(struct NByteVector* vector, int32_t index, char value) {
 #if NBYTEVECTOR_BOUNDARY_CHECK
-    // TODO: trigger some error condition...
-    if (index >= vector->size) return False;
+    if (index >= vector->size) {
+        NERROR("NByteVector.get()", "Index out of bound: %d", index);
+        return False;
+    }
 #endif
 
     vector->objects[index] = value;

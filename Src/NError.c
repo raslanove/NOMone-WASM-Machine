@@ -10,8 +10,8 @@ static void initialize() {
 }
 
 static void terminate() {
-    NVector.destroy(errorsStack);
-    NSystemUtils.free(errorsStack);
+    if (!errorsStack) return ;
+    NVector.destroyAndFree(errorsStack);
     errorsStack = 0;
 }
 
@@ -20,20 +20,38 @@ static int32_t observeErrors() {
     return NVector.size(errorsStack);
 }
 
-static struct NError* vPushError(const char* errorMessageFormat, va_list vaList) {
+static struct NError* vPushError(const char* tag, const char* errorMessageFormat, va_list vaList) {
     if (!errorsStack) initialize();
 
     // Create the error message,
     struct NString* errorMessageString = NString.create("");
     NString.vAppend(errorMessageString, errorMessageFormat, vaList);
+    // Note: vAppend could throw an error, which accordingly preserves and new error
+    // instance in the stack. If the stack is not large enough, it will be reallocated,
+    // and ALL the pointers that were once pointing to instances in the stack will
+    // become invalid. Thus, we create the error instance AFTER the vAppend() call.
 
     // Create a new error in the stack,
     struct NError* newError = (struct NError*) NVector.emplaceBack(errorsStack);
+
+    // Copy the tag,
+    int32_t charIndex=0;
+    while (charIndex<NERROR_MAX_TAG_LENGTH && tag[charIndex]) {
+        newError->tag[charIndex] = tag[charIndex];
+        charIndex++;
+    }
+    if (charIndex==NERROR_MAX_TAG_LENGTH) {
+        charIndex--;
+        NERROR("NError", "Error tag exceeded maximum length");
+    }
+    newError->tag[charIndex] = 0;
+
+    // Copy the message,
     int32_t messageLength = NString.length(errorMessageString);
     if (messageLength >= NERROR_MAX_MESSAGE_LENGTH) {
         NSystemUtils.memcpy(newError->message, NString.get(errorMessageString), NERROR_MAX_MESSAGE_LENGTH-1);
         newError->message[NERROR_MAX_MESSAGE_LENGTH-1] = 0;
-        NERROR("NError", "Error message length exceeded maximum size");
+        NERROR("NError", "Error message exceeded maximum length");
     } else {
         NSystemUtils.memcpy(newError->message, NString.get(errorMessageString), messageLength+1);
     }
@@ -44,10 +62,10 @@ static struct NError* vPushError(const char* errorMessageFormat, va_list vaList)
     return newError;
 }
 
-static struct NError* pushError(const char* errorMessageFormat, ...) {
+static struct NError* pushError(const char* tag, const char* errorMessageFormat, ...) {
     va_list vaList;
     va_start(vaList, errorMessageFormat);
-    struct NError* error = vPushError(errorMessageFormat, vaList);
+    struct NError* error = vPushError(tag, errorMessageFormat, vaList);
     va_end(vaList);
     return error;
 }
@@ -55,7 +73,7 @@ static struct NError* pushError(const char* errorMessageFormat, ...) {
 static struct NError* pushAndPrintError(const char* tag, const char* errorMessageFormat, ...) {
     va_list vaList;
     va_start(vaList, errorMessageFormat);
-    struct NError* error = vPushError(errorMessageFormat, vaList);
+    struct NError* error = vPushError(tag, errorMessageFormat, vaList);
     va_end(vaList);
 
     NLOGE(tag, "%s", error->message);
@@ -93,6 +111,27 @@ static int32_t popDestroyAndFreeErrors(int32_t stackPosition) {
     return errorsCount;
 }
 
+static int32_t logAndTerminate() {
+
+    // Check if any errors ended up without handling,
+    struct NVector* errors = popErrors(0);
+    if (errors) {
+        NLOGW("Unhandled errors", "%sUnhandled errors count: %d", NTCOLOR(HIGHLIGHT), NVector.size(errors));
+        struct NError error;
+        while (NVector.popBack(errors, &error)) {
+            if (error.tag && error.tag[0]) {
+                NLOGW(0, "  %s: %s", error.tag, error.message);
+            } else {
+                NLOGW(0, "  %s", error.message);
+            }
+        }
+        NError.destroyAndFreeErrors(errors);
+    }
+
+    // Terminate!
+    terminate();
+}
+
 const struct NError_Interface NError = {
     .terminate = terminate,
     .observeErrors = observeErrors,
@@ -100,5 +139,6 @@ const struct NError_Interface NError = {
     .pushAndPrintError = pushAndPrintError,
     .popErrors = popErrors,
     .destroyAndFreeErrors = destroyAndFreeErrors,
-    .popDestroyAndFreeErrors = popDestroyAndFreeErrors
+    .popDestroyAndFreeErrors = popDestroyAndFreeErrors,
+    .logAndTerminate = logAndTerminate
 };

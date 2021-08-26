@@ -48,7 +48,11 @@ static void* nMemcpy(void* dest, const void* src, int32_t length) {
     va_end(vaList); \
     if (!errorsCount) { \
         struct NString* coloredString = NString.replace(NString.get(formattedString), NTCOLOR(STREAM_DEFAULT), color); \
-        printf("%s%s: %s%s\n", color, tag, NString.get(coloredString), NTCOLOR(RESET)); \
+        if (tag && tag[0]) { \
+            printf("%s%s: %s%s\n", color, tag, NString.get(coloredString), NTCOLOR(RESET)); \
+        } else { \
+            printf("%s%s%s\n", color, NString.get(coloredString), NTCOLOR(RESET)); \
+        } \
         NString.destroyAndFree(coloredString); \
     } \
     NString.destroyAndFree(formattedString)
