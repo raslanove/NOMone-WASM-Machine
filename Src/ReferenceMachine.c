@@ -10,8 +10,6 @@
 #define MAX_TOKEN_LENGTH 256
 #define INLINE inline
 
-#define LOG_TAG "Ref machine"
-
 struct ParsingStructure {
     struct NWM_WasmMachine *machine;
     const char* watCode;
@@ -19,8 +17,8 @@ struct ParsingStructure {
 
 static boolean INLINE isWhiteSpace(char byte);
 static boolean INLINE isOneByteToken(char byte);
-static int32_t INLINE skipWhiteSpaces(const char* string, int32_t index);
-static int32_t getToken(const char* string, int32_t index, char* outputToken);
+static void INLINE skipWhiteSpaces(const char* string, int32_t* in_out_index);
+static boolean getToken(const char* logTag, const char* inputText, int32_t* in_out_index, const char* expectedToken, char* outputToken);
 static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t watCodeByteIndex);
 static boolean parseModuleExpression(struct ParsingStructure* parsingStructure, int32_t watCodeByteIndex);
 
@@ -48,53 +46,74 @@ static boolean INLINE isOneByteToken(char byte) {
     return byte=='(' || byte==')' || byte==';';
 }
 
-static int32_t INLINE skipWhiteSpaces(const char* string, int32_t index) {
-
-    char byte = string[index];
-    while (isWhiteSpace(byte)) byte = string[++index];
-
-    return index;
+static void INLINE skipWhiteSpaces(const char* string, int32_t* in_out_index) {
+    char byte = string[*in_out_index];
+    while (isWhiteSpace(byte)) byte = string[++(*in_out_index)];
 }
 
-static int32_t getToken(const char* string, int32_t index, char* outputToken) {
+// TODO: modify to accept token type instead of exact token text?
+// Returns True if parsing should continue.
+static boolean getToken(const char* logTag, const char* inputText, int32_t* in_out_index, const char* expectedToken, char* outputToken) {
 
-    index = skipWhiteSpaces(string, index);
-    char byte = string[index];
+    skipWhiteSpaces(inputText, in_out_index);
+    char byte = inputText[*in_out_index];
 
-    // One byte tokens,
-    if (isOneByteToken(byte)) {
+    boolean shouldContinueParsing = True;
+    if (!byte) {
+
+        // Check for end-of-file,
+        NCString.copy(outputToken, "EOF");
+        shouldContinueParsing = False;
+
+    } else if (isOneByteToken(byte)) {
+
+        // One byte tokens,
         outputToken[0] = byte;
         outputToken[1] = 0;
-        return index+1;
-    }
+        (*in_out_index)++;
 
-    // Word tokens,
-    int32_t outputIndex = 0;
-    while (byte && !isWhiteSpace(byte) && !isOneByteToken(byte)) {
-        outputToken[outputIndex++] = byte;
-        if (outputIndex == MAX_TOKEN_LENGTH) {
-            NERROR(LOG_TAG, "TOKEN exceeded maximum length: %s", outputToken);
-            outputToken[outputIndex] = 0;
-            return index;
+    } else {
+
+        // Word tokens,
+        int32_t outputIndex = 0;
+        while (byte && !isWhiteSpace(byte) && !isOneByteToken(byte)) {
+            outputToken[outputIndex++] = byte;
+            if (outputIndex == MAX_TOKEN_LENGTH) {
+                NERROR(logTag, "TOKEN exceeded maximum length: %s", outputToken);
+                shouldContinueParsing = False;
+                break;
+            }
+            byte = inputText[++(*in_out_index)];
         }
-        byte = string[++index];
+        outputToken[outputIndex] = 0;
     }
 
-    outputToken[outputIndex] = 0;
-    return index;
+    // Check if this is the expected token,
+    // TODO: keep track of line number and current column to use in error reporting...
+    if (expectedToken && !NCString.equals(outputToken, expectedToken)) {
+        NERROR(logTag, "Expected: \"%s\", found: \"%s\"", expectedToken, outputToken);
+        shouldContinueParsing = False;
+    }
+
+    // TODO: remove...
+    if (shouldContinueParsing) NLOGI(logTag, "found token: %s", outputToken);
+
+    return shouldContinueParsing;
 }
 
 static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t watCodeByteIndex) {
 
+#define LOG_TAG "ReferenceMachine.parseModule()"
+#define ASSERT_TOKEN(expectedToken) if (!getToken(LOG_TAG, parsingStructure->watCode, &watCodeByteIndex, expectedToken, token)) return False
+
     // Parse,
     char token[MAX_TOKEN_LENGTH];
-    watCodeByteIndex = getToken(parsingStructure->watCode, watCodeByteIndex, token);
-    // TODO: check for open parenthesis...
-    if (!NCString.startsWith(&(parsingStructure->watCode[watCodeByteIndex]), "module")) return False;
 
-    // Advance the wat byte index,
-    watCodeByteIndex += 7; // strlen("(module")
-    watCodeByteIndex = skipWhiteSpaces(parsingStructure->watCode, watCodeByteIndex);
+    // "(",
+    ASSERT_TOKEN("(");
+
+    // "module",
+    ASSERT_TOKEN("module");
 
     // ...xxx
 

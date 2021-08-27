@@ -8,7 +8,8 @@
 #include <NTypes.h>
 
 struct NCString_Interface {
-    boolean (*startsWith)(const char* string, const char* value);  // True if successful.
+    boolean (*startsWith)(const char* string, const char* value);
+    boolean (*equals)(const char* string, const char* value);
     char* (*copy)(char* destination, const char* source); // Returns destination.
 };
 
