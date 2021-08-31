@@ -36,13 +36,15 @@ static struct NError* vPushError(const char* tag, const char* errorMessageFormat
 
     // Copy the tag,
     int32_t charIndex=0;
-    while (charIndex<NERROR_MAX_TAG_LENGTH && tag[charIndex]) {
-        newError->tag[charIndex] = tag[charIndex];
-        charIndex++;
-    }
-    if (charIndex==NERROR_MAX_TAG_LENGTH) {
-        charIndex--;
-        NERROR("NError", "Error tag exceeded maximum length");
+    if (tag) {
+        while (charIndex<NERROR_MAX_TAG_LENGTH && tag[charIndex]) {
+            newError->tag[charIndex] = tag[charIndex];
+            charIndex++;
+        }
+        if (charIndex==NERROR_MAX_TAG_LENGTH) {
+            charIndex--;
+            NERROR("NError", "Error tag exceeded maximum length");
+        }
     }
     newError->tag[charIndex] = 0;
 
@@ -115,11 +117,12 @@ static int32_t logAndTerminate() {
 
     // Check if any errors ended up without handling,
     struct NVector* errors = popErrors(0);
+    int32_t errorsCount = NVector.size(errors);
     if (errors) {
         NLOGW("Unhandled errors", "%sUnhandled errors count: %d", NTCOLOR(HIGHLIGHT), NVector.size(errors));
         struct NError error;
         while (NVector.popBack(errors, &error)) {
-            if (error.tag && error.tag[0]) {
+            if (error.tag[0]) {
                 NLOGW(0, "  %s: %s", error.tag, error.message);
             } else {
                 NLOGW(0, "  %s", error.message);
@@ -130,6 +133,8 @@ static int32_t logAndTerminate() {
 
     // Terminate!
     terminate();
+
+    return errorsCount;
 }
 
 const struct NError_Interface NError = {

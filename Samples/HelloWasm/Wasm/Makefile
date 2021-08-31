@@ -3,8 +3,10 @@ LINKER_FLAGS =
 
 CFLAGS = -I../../../Src/Includes/ -DDESKTOP -g -MMD# g=>generate debug info. MMD=>generate dependency files.
 
-# Clang is more picky. Using it can help us pin-point more issues.
+# WASM specific
 CC = clang
+CFLAGS += --target=wasm32 -O3 -nostdlib
+LINKER_FLAGS += -Wl,--no-entry -Wl,--export-all -Wl,-z,stack-size=65536
 
 # Optimization flags,
 #CFLAGS += -s -O3 -fdata-sections -ffunction-sections 
@@ -12,12 +14,12 @@ CC = clang
 
 SOURCES = \
 	$(wildcard ../../../Src/*.c) \
-	$(wildcard ../../../Src/Backends/Linux/*.c) \
+	$(wildcard ../../../Src/Backends/Wasm/*.c) \
 	$(wildcard ../Src/*.c) \
 
 OBJECTS = $(SOURCES:.c=.o)
 
-TARGET = HelloWasm.o
+TARGET = HelloWasm.wasm
 
 # Targets start here.
 all: $(TARGET)
