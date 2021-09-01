@@ -20,6 +20,7 @@ static boolean INLINE isOneByteToken(char byte);
 static void INLINE skipWhiteSpaces(const char* string, int32_t* in_out_index);
 static boolean getToken(const char* logTag, const char* inputText, int32_t* in_out_index, const char* expectedToken, char* outputToken);
 static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex);
+static boolean parseType(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex);
 
 static void NWM_destroyReferenceMachine(struct NWM_WasmMachine *machine) {
     machine->alive = False;
@@ -97,27 +98,81 @@ static boolean getToken(const char* logTag, const char* inputText, int32_t* in_o
     return shouldContinueParsing;
 }
 
+#define ASSERT_TOKEN(expectedToken) \
+if (!getToken(LOG_TAG, parsingStructure->watCode, in_out_watCodeByteIndex, expectedToken, token)) { \
+    *in_out_watCodeByteIndex = initialWatCodeByteIndex; \
+    return False; \
+}
+#define TEST_TOKEN(testValue) NCString.equals(token, testValue)
+
 static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex) {
 
-    int32_t initialByteCodeIndex = *in_out_watCodeByteIndex;
-
+    #undef LOG_TAG
     #define LOG_TAG "ReferenceMachine.parseModule()"
-    #define ASSERT_TOKEN(expectedToken) \
-    if (!getToken(LOG_TAG, parsingStructure->watCode, in_out_watCodeByteIndex, expectedToken, token)) { \
-        *in_out_watCodeByteIndex = initialByteCodeIndex; \
-        return False; \
-    }
-    #define TEST_TOKEN(testValue) NCString.equals(token, testValue)
+    int32_t initialWatCodeByteIndex = *in_out_watCodeByteIndex;
 
     // Parse,
     char token[MAX_TOKEN_LENGTH];
-
-    // "(",
     ASSERT_TOKEN("(")
-
-    // "module",
     ASSERT_TOKEN("module")
 
+    // Parse child expressions,
+    // Note: this could be accelerated by using trees, but would compromise readability. Maybe
+    // use Flex and Bison for the accelerated (non-reference) machine.
+    do {
+        // Get token,
+        int32_t childExpressionIndex = *in_out_watCodeByteIndex;
+        ASSERT_TOKEN(0)
+
+        // ")",
+        if (TEST_TOKEN(")")) {
+            // TODO: finalize and save the module structure...
+            return True;
+        } else if (TEST_TOKEN("(")) {
+
+            // Check child expressions,
+            int32_t errorsStart = NError.observeErrors();
+            *in_out_watCodeByteIndex = childExpressionIndex; // Return to the child expression beginning.
+
+            // Check for type expression,
+            // TODO: turn into a macro...
+            if (parseType(parsingStructure, in_out_watCodeByteIndex)) continue;
+            if (NError.observeErrors()-errorsStart > 0) {
+                // TODO: destroy the allocated data structure...
+                return False;
+            }
+
+            // TODO: ...Check other expressions...
+            // ....xxx
+
+        } else {
+            NERROR(LOG_TAG, "Expected: \"%s)%s\" or \"%s(%s\", found: \"%s%s%s\"", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), token, NTCOLOR(STREAM_DEFAULT));
+            return False;
+        }
+    } while (True);
+}
+
+static boolean parseType(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex) {
+
+    #undef LOG_TAG
+    #define LOG_TAG "ReferenceMachine.parseType()"
+    int32_t initialWatCodeByteIndex = *in_out_watCodeByteIndex;
+
+    // Parse,
+    // Example: (type (;10;) (func (param i32 i32 i32 i32) (result i32)))
+    char token[MAX_TOKEN_LENGTH];
+    ASSERT_TOKEN("(")
+    ASSERT_TOKEN("type")
+    ASSERT_TOKEN("(")
+    ASSERT_TOKEN(";")
+
+    // Get the type number,
+    ASSERT_TOKEN(0)
+
+    // ...xxxx
+    //NCString.parseInteger(token)
+
+    /*
     // Parse child expressions,
     // Note: this could be accelerated by using trees, but would compromise readability. Maybe
     // use Flex and Bison for the accelerated (non-reference) machine.
@@ -131,27 +186,32 @@ static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t* i
             // TODO: finalize and save the module structure...
             return True;
         } else if (TEST_TOKEN("(")) {
+
             // Check child expressions,
+            int32_t errorsStart = NError.observeErrors();
+
+            // Check for type expression,
+            // TODO: turn into a macro...
             *in_out_watCodeByteIndex = childExpressionIndex;
-            // observe errors ...
+            if (parseType(parsingStructure, in_out_watCodeByteIndex)) {
+                childExpressionIndex = in_out_watCodeByteIndex;
+                continue;
+            }
+            if (NError.observeErrors()-errorsStart > 0) {
+                // TODO: destroy the allocated data structure...
+                return False;
+            }
+
+            // TODO: ...Check other expressions...
             // ....xxx
-            // return false if error occurred...
+
         } else {
             NERROR(LOG_TAG, "Expected: \"%s)%s\" or \"%s(%s\", found: \"%s%s%s\"", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), token, NTCOLOR(STREAM_DEFAULT));
             return False;
         }
     } while (True);
 
-    return True;
-}
-
-static boolean parseType(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex) {
-
-#undef LOG_TAG
-#define LOG_TAG "ReferenceMachine.parseType()"
-    int32_t initialWatCodeIndex = *in_out_watCodeByteIndex;
-    char token[MAX_TOKEN_LENGTH];
-
+    */
     return True;
 }
 

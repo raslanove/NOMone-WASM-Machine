@@ -117,9 +117,10 @@ static int32_t logAndTerminate() {
 
     // Check if any errors ended up without handling,
     struct NVector* errors = popErrors(0);
-    int32_t errorsCount = NVector.size(errors);
+    int32_t errorsCount=0;
     if (errors) {
-        NLOGW("Unhandled errors", "%sUnhandled errors count: %d", NTCOLOR(HIGHLIGHT), NVector.size(errors));
+        errorsCount = NVector.size(errors);
+        NLOGW("Unhandled errors", "%sUnhandled errors count: %d", NTCOLOR(HIGHLIGHT), errorsCount);
         struct NError error;
         while (NVector.popBack(errors, &error)) {
             if (error.tag[0]) {
