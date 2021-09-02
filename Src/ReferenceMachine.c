@@ -47,16 +47,76 @@ static boolean INLINE isOneByteToken(char byte) {
     return byte=='(' || byte==')' || byte==';';
 }
 
+static void INLINE skipDelimitedComment(const char* string, int32_t* in_out_index) {
+
+    int32_t index = *in_out_index;
+    if ((string[index]!='(') || (string[index+1]!=';')) return;
+
+    index+=2;
+    do {
+        *in_out_index = index;
+
+        char byte = string[index];
+        while (byte && (byte!='(') && (byte!=';')) byte = string[++index];
+
+        if (byte=='(') {
+            if (string[index+1]==';') {
+                skipDelimitedComment(string, &index);
+            } else {
+                index++;
+            }
+        } else if (byte==';') {
+            if (string[index+1]==')') {
+                // Found the end of the comment,
+                *in_out_index = index+2;
+                return ;
+            } else {
+                index++;
+            }
+        } else {
+            // String ended before the terminating delimeter,
+            // TODO: add line number and column of the comment beginning...
+            NERROR("ReferenceMachine.skipDelimitedComment()", "Delimited comment without terminating delimeter");
+            *in_out_index = index;
+            return;
+        }
+
+    } while (*in_out_index != index); // Continue as long as some progress took place within this iteration.
+}
+
 static void INLINE skipWhiteSpaces(const char* string, int32_t* in_out_index) {
-    char byte = string[*in_out_index];
-    while (isWhiteSpace(byte)) byte = string[++(*in_out_index)];
+
+    int32_t index = *in_out_index;
+    do {
+        *in_out_index = index;
+
+        // Attempt skipping,
+        char byte = string[index];
+
+        // Actual whitespaces,
+        while (isWhiteSpace(byte)) byte = string[++index];
+
+        // Line comments (line comments start with ;; and continue till the end of the line),
+        if (byte==';' && string[index+1]==';') {
+            // Skip to the line end,
+            index++;
+            do { byte = string[++index]; } while (byte && (byte!='\n'));
+        }
+
+        // Delimited comments (delimited comments start with (; and end with ;). They can also be nested),
+        skipDelimitedComment(string, &index);
+    } while (index > *in_out_index); // Continue as long as some progress took place within this iteration.
 }
 
 // TODO: modify to accept token type instead of exact token text?
 // Returns True if parsing should continue.
 static boolean getToken(const char* logTag, const char* inputText, int32_t* in_out_index, const char* expectedToken, char* outputToken) {
 
+    // Skip whitespaces (which also include comments),
+    int32_t errorsBeginning = NError.observeErrors();
     skipWhiteSpaces(inputText, in_out_index);
+    if (NError.observeErrors()>errorsBeginning) return False;
+
     char byte = inputText[*in_out_index];
 
     boolean shouldContinueParsing = True;

@@ -5,7 +5,10 @@
 
 void NMain() {
 
-    char watCode[] = "(module)";
+    char watCode[] =
+        ";; Line comment :)\n"
+        "(;  (;sdfsdfsdfdsfsd;)\n"
+        "(module);) (module)";
 
     struct NWM_WasmMachine* machine = NWM.createReferenceWasmMachineInHeap();
     boolean result = machine->parseWatCode(machine, watCode);
