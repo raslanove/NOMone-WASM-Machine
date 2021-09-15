@@ -1,3 +1,4 @@
+- Re-write header files so that the interfaces have atlernative class declarations to remove indirect jumps if C++ support is available.
 - All create should be renamed into initialize (except NString).
 - All createInHeap should be renamed to create.
 - Remove all unnecessary interfaces and use "__" instead of ".". For example:
@@ -5,3 +6,17 @@
       NError.terminate();
     use:     
       NError__terminate();
+      
+      
+      
+
+For each index space, there are records:
+========================================
+𝐼 ::= { types    (id)*,
+       funcs    (id)*,
+       tables   (id)*,
+       mems     (id)*,
+       globals  (id)*,
+       locals   (id)*,
+       labels   (id)*,
+       typedefs functype* }

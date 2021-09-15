@@ -21,6 +21,14 @@ static void INLINE skipWhiteSpaces(const char* string, int32_t* in_out_index);
 static boolean getToken(const char* logTag, const char* inputText, int32_t* in_out_index, const char* expectedToken, char* outputToken);
 static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex);
 static boolean parseType(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex);
+static boolean parseFunctionParameters(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex);
+
+#define ASSERT_TOKEN(expectedToken) \
+if (!getToken(LOG_TAG, parsingStructure->watCode, in_out_watCodeByteIndex, expectedToken, token)) { \
+    *in_out_watCodeByteIndex = initialWatCodeByteIndex; \
+    return False; \
+}
+#define TEST_TOKEN(testValue) NCString.equals(token, testValue)
 
 static void NWM_destroyReferenceMachine(struct NWM_WasmMachine *machine) {
     machine->alive = False;
@@ -28,15 +36,27 @@ static void NWM_destroyReferenceMachine(struct NWM_WasmMachine *machine) {
 
 static boolean parseWatCode(struct NWM_WasmMachine *machine, const char* watCode) {
 
-    // Start parsing (recursive descent),
-    struct ParsingStructure parsingStructure;
-    parsingStructure.machine = machine;
-    parsingStructure.watCode = watCode;
-
+    // Provide storage for the data stucture and pointers,
+    struct ParsingStructure parsingStructureInstance;
+    parsingStructureInstance.machine = machine;
+    parsingStructureInstance.watCode = watCode;
     int32_t watCodeIndex=0;
-    boolean success = parseModule(&parsingStructure, &watCodeIndex);
 
-    return success;
+    // Parse,
+    struct ParsingStructure* parsingStructure = &parsingStructureInstance;
+    int32_t* in_out_watCodeByteIndex = &watCodeIndex;
+
+    #undef LOG_TAG
+    #define LOG_TAG "ReferenceMachine.parseWatCode()"
+    int32_t initialWatCodeByteIndex = *in_out_watCodeByteIndex;
+    char token[MAX_TOKEN_LENGTH];
+
+    if (!parseModule(parsingStructure, in_out_watCodeByteIndex)) return False;
+
+    // Make sure the file ends here,
+    ASSERT_TOKEN("EOF")
+
+    return True;
 }
 
 static boolean INLINE isWhiteSpace(char byte) {
@@ -158,21 +178,14 @@ static boolean getToken(const char* logTag, const char* inputText, int32_t* in_o
     return shouldContinueParsing;
 }
 
-#define ASSERT_TOKEN(expectedToken) \
-if (!getToken(LOG_TAG, parsingStructure->watCode, in_out_watCodeByteIndex, expectedToken, token)) { \
-    *in_out_watCodeByteIndex = initialWatCodeByteIndex; \
-    return False; \
-}
-#define TEST_TOKEN(testValue) NCString.equals(token, testValue)
-
 static boolean parseModule(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex) {
 
     #undef LOG_TAG
     #define LOG_TAG "ReferenceMachine.parseModule()"
     int32_t initialWatCodeByteIndex = *in_out_watCodeByteIndex;
+    char token[MAX_TOKEN_LENGTH];
 
     // Parse,
-    char token[MAX_TOKEN_LENGTH];
     ASSERT_TOKEN("(")
     ASSERT_TOKEN("module")
 
@@ -217,46 +230,37 @@ static boolean parseType(struct ParsingStructure* parsingStructure, int32_t* in_
     #undef LOG_TAG
     #define LOG_TAG "ReferenceMachine.parseType()"
     int32_t initialWatCodeByteIndex = *in_out_watCodeByteIndex;
+    char token[MAX_TOKEN_LENGTH];
 
     // Parse,
-    // Example: (type (;10;) (func (param i32 i32 i32 i32) (result i32)))
-    char token[MAX_TOKEN_LENGTH];
+    // Example: (type (func (param i32 i32 i32 i32) (result i32)))
+    // Note: currently, we can only define function types, so we don't have a separate function
+    // to parse functions.
     ASSERT_TOKEN("(")
     ASSERT_TOKEN("type")
     ASSERT_TOKEN("(")
-    ASSERT_TOKEN(";")
+    ASSERT_TOKEN("func")
 
-    // Get the type number,
-    ASSERT_TOKEN(0)
-
-    // ...xxxx
-    //NCString.parseInteger(token)
-
-    /*
     // Parse child expressions,
-    // Note: this could be accelerated by using trees, but would compromise readability. Maybe
-    // use Flex and Bison for the accelerated (non-reference) machine.
-    int32_t childExpressionIndex = *in_out_watCodeByteIndex;
     do {
         // Get token,
+        int32_t childExpressionIndex = *in_out_watCodeByteIndex;
         ASSERT_TOKEN(0)
 
         // ")",
         if (TEST_TOKEN(")")) {
-            // TODO: finalize and save the module structure...
+            ASSERT_TOKEN(")")
+            // TODO: finalize and save the function type structure...
             return True;
         } else if (TEST_TOKEN("(")) {
 
             // Check child expressions,
             int32_t errorsStart = NError.observeErrors();
+            *in_out_watCodeByteIndex = childExpressionIndex; // Return to the child expression beginning.
 
             // Check for type expression,
             // TODO: turn into a macro...
-            *in_out_watCodeByteIndex = childExpressionIndex;
-            if (parseType(parsingStructure, in_out_watCodeByteIndex)) {
-                childExpressionIndex = in_out_watCodeByteIndex;
-                continue;
-            }
+            if (parseFunctionParameters(parsingStructure, in_out_watCodeByteIndex)) continue;
             if (NError.observeErrors()-errorsStart > 0) {
                 // TODO: destroy the allocated data structure...
                 return False;
@@ -270,9 +274,46 @@ static boolean parseType(struct ParsingStructure* parsingStructure, int32_t* in_
             return False;
         }
     } while (True);
+}
 
-    */
-    return True;
+static boolean parseFunctionParameters(struct ParsingStructure* parsingStructure, int32_t* in_out_watCodeByteIndex) {
+
+    #undef LOG_TAG
+    #define LOG_TAG "ReferenceMachine.parseFunctionParameters()"
+    int32_t initialWatCodeByteIndex = *in_out_watCodeByteIndex;
+    char token[MAX_TOKEN_LENGTH];
+
+    // Parse,
+    // Example: (param i32 i32 i32 i32)
+    ASSERT_TOKEN("(")
+    ASSERT_TOKEN("param")
+
+    // Parse arguments,
+    int32_t parametersCount=0;
+    do {
+        // Get token,
+        ASSERT_TOKEN(0)
+
+        // ")",
+        if (TEST_TOKEN(")")) {
+            if (parametersCount > 0) {
+                // TODO: finalize and save the parameters to the current function...
+                return True;
+            } else {
+                NERROR(LOG_TAG, "Found param structure without any parameters");
+                return False;
+            }
+        } else if (TEST_TOKEN("i32")) {
+            parametersCount++;
+            // TODO: add this i32 parameter...
+        } else if (TEST_TOKEN("f64")) {
+            parametersCount++;
+            // TODO: add this f64 parameter...
+        } else {
+            NERROR(LOG_TAG, "Expected: \"%s)%s\" or \"%si32%s\" or \"%sf64%s\", found: \"%s%s%s\"", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), token, NTCOLOR(STREAM_DEFAULT));
+            return False;
+        }
+    } while (True);
 }
 
 struct NWM_WasmMachine *NWM_createReferenceWasmMachine(struct NWM_WasmMachine *outputMachine) {
