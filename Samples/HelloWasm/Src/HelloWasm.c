@@ -8,7 +8,7 @@ void NMain() {
     char watCode[] =
         "(module\n"
         "  (type (;0;) (func))"
-        "  (type (;1;) (func (param i32 i32 i32)))"
+        "  (type (;1;) (func (result i32) (param i32 i32 i64)))"
         ")";
 
     struct NWM_WasmMachine* machine = NWM.createReferenceWasmMachineInHeap();
