@@ -3,7 +3,7 @@
 #include <NError.h>
 #include <NVector.h>
 
-void NMain() {
+void NMain(int argc, char *argv[]) {
 
     char watCode[] =
         "(module\n"

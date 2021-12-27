@@ -285,7 +285,7 @@ static boolean parseType(struct ParsingStructure* parsingStructure, int32_t* in_
             ASSERT_TOKEN(0, False)
             ASSERT_TOKEN(0, False)
             if (!parametersParsed && !resultParsed) {
-                NERROR(LOG_TAG, "Expected: \"%s(param%s\" or \"%s(result%s\ or \"%s)%s\", found: \"%s(%s%s\"", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), token, NTCOLOR(STREAM_DEFAULT));
+                NERROR(LOG_TAG, "Expected: \"%s(param%s\" or \"%s(result%s or \"%s)%s\", found: \"%s(%s%s\"", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), token, NTCOLOR(STREAM_DEFAULT));
                 goto failureCleanUp;
             } else if (!parametersParsed) {
                 NERROR(LOG_TAG, "Expected: \"%s(param%s\" or \"%s)%s\", found: \"%s(%s%s\"", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), token, NTCOLOR(STREAM_DEFAULT));

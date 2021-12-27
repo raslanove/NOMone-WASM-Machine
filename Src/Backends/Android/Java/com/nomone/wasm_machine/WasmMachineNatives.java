@@ -1,15 +1,12 @@
 package com.nomone.wasm_machine;
 
+import com.nomone.std_lib.StdLibNatives;
+
 public class WasmMachineNatives {
 
-    static {
-        System.loadLibrary("WasmMachine");
-    }
+    //static { System.loadLibrary("NOMoneStdLib"); }
 
-    public static void start() {
-        // Necessary to trigger running the static code. Could also use Class.forName instead of
-        // calling a method.
-    }
+    public static void start() { StdLibNatives.start(); }
 
     public static int createReferenceMachine() { return nativeCreateReferenceMachine(); }
     public static void destroyMachine(int machineIndex) { nativeDestroyMachine(machineIndex); }

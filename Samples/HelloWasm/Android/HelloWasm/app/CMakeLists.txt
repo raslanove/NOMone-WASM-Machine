@@ -1,56 +1,49 @@
 # For more information about using CMake with Android Studio, read the
 # documentation: https://d.android.com/studio/projects/add-native-code.html
 
-# Sets the minimum version of CMake required to build the native library.
-
 cmake_minimum_required(VERSION 3.4.1)
 
-# Creates and names a library, sets it as either STATIC
-# or SHARED, and provides the relative paths to its source code.
-# You can define multiple libraries, and CMake builds them for you.
-# Gradle automatically packages shared libraries with your APK.
-
 add_definitions(-DNMAIN=1)
+include_directories(
+        ../../../../../Src/Includes/
+        ../../../../../NOMoneCC/Src/Includes/
+        ../../../../../NOMoneCC/Src/NOMoneStdLib/Includes/ )
 
-FILE(GLOB AndroidCPPFiles ../../../../../Src/Backends/Android/Cpp/*.cpp)
-FILE(GLOB    CommonCFiles ../../../../../Src/*.c)
-FILE(GLOB       SrcCFiles ../../../Src/*.c)
+# WASMMachine library,
+FILE(GLOB                  SrcCFiles ../../../Src/*.c)
+FILE(GLOB          WASMMachineCFiles ../../../../../Src/*.c)
+FILE(GLOB WASMMachineAndroidCPPFiles ../../../../../Src/Backends/Android/Cpp/*.cpp)
 
 set(SRC
         ${SrcCFiles}
-        ${AndroidCPPFiles}
-        ${CommonCFiles})
+        ${WASMMachineCFiles}
+        ${WASMMachineAndroidCPPFiles})
 
-add_library( # Sets the name of the library.
-             WasmMachine
+add_library(WasmMachine STATIC ${SRC})
 
-             # Sets the library as a shared library.
-             SHARED
+# NOMoneCC library,
+FILE(GLOB                  NCCCFiles ../../../../../NOMoneCC/Src/*.c)
+FILE(GLOB      StdLibAndroidCPPFiles ../../../../../NOMoneCC/Src/NOMoneStdLib/Backends/Android/Cpp/*.cpp)
+FILE(GLOB         StdLibCommonCFiles ../../../../../NOMoneCC/Src/NOMoneStdLib/*.c)
 
-             # Provides a relative path to your source file(s).
-             ${SRC} )
+set(SRC
+        ${NCCCFiles}
+        ${StdLibAndroidCPPFiles}
+        ${StdLibCommonCFiles})
 
-include_directories( ../../../../../Src/Includes/ )
+add_library(NOMoneStdLib SHARED ${SRC})
 
-# Searches for a specified prebuilt library and stores the path as a
-# variable. Because CMake includes system libraries in the search path by
-# default, you only need to specify the name of the public NDK library
-# you want to add. CMake verifies that the library exists before
-# completing its build.
+find_library(log-lib log)
 
-find_library( # Sets the name of the path variable.
-              log-lib
+target_link_libraries(
+        NOMoneStdLib
 
-              # Specifies the name of the NDK library that
-              # you want CMake to locate.
-              log )
+        # Since WasmMachine is a static library, only the symbols used in NOMoneStdLib are pulled
+        # from it. But we intend to use other symbols from the java side, hence, we instruct the
+        # linker to grab the whole library,
+        -Wl,-whole-archive
+        WasmMachine
+        -Wl,-no-whole-archive
 
-# Specifies libraries CMake should link to your target library. You
-# can link multiple libraries, such as libraries you define in this
-# build script, prebuilt third-party libraries, or system libraries.
-
-target_link_libraries( # Specifies the target library.
-                       WasmMachine
-
-                       android
-                       ${log-lib} )
+        android
+        ${log-lib})

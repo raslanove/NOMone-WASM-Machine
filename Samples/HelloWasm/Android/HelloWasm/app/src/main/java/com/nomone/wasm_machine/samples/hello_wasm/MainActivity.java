@@ -2,7 +2,6 @@ package com.nomone.wasm_machine.samples.hello_wasm;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.TextView;
 
 import com.nomone.wasm_machine.WasmMachineNatives;
@@ -21,13 +20,13 @@ public class MainActivity extends Activity {
 
         WasmMachineNatives.start();
 
-        /*
+
         int machineIndex = WasmMachineNatives.createReferenceMachine();
         boolean result = WasmMachineNatives.parseWatCode(machineIndex, "(module)");
         textView.setText("" + result);
         WasmMachineNatives.destroyMachine(machineIndex);
 
         try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
-        */
+
     }
 }

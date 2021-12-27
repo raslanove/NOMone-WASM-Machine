@@ -7,7 +7,7 @@ static boolean initialized=False;
 static struct NVector machines;
 
 static void initialize() {
-    NVector.create(1, sizeof(NWM_WasmMachine), &machines);
+    NVector.initialize(&machines, 1, sizeof(NWM_WasmMachine));
     initialized = True;
 }
 
