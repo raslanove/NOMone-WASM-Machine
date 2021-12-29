@@ -20,13 +20,13 @@ public class MainActivity extends Activity {
 
         WasmMachineNatives.start();
 
-
+        /*
         int machineIndex = WasmMachineNatives.createReferenceMachine();
         boolean result = WasmMachineNatives.parseWatCode(machineIndex, "(module)");
         textView.setText("" + result);
         WasmMachineNatives.destroyMachine(machineIndex);
 
         try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
-
+        */
     }
 }

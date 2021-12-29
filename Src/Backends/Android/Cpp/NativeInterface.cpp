@@ -45,7 +45,7 @@ JNI_CALL_PREFIX int JNICALL JNI_FUNCTION_NAME_PREFIX(nativeCreateReferenceMachin
     }
 
     // Create the new machine,
-    NWM.createReferenceWasmMachine(getMachine(newMachineIndex));
+    NWM.initializeReferenceMachine(getMachine(newMachineIndex));
 
     return newMachineIndex;
 }

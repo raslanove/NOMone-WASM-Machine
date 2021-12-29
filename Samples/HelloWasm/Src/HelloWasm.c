@@ -11,10 +11,9 @@ void NMain(int argc, char *argv[]) {
         "  (type (;1;) (func (result i32) (param i32 i32 i64)))"
         ")";
 
-    struct NWM_WasmMachine* machine = NWM.createReferenceWasmMachineInHeap();
+    struct NWM_WasmMachine* machine = NWM.createReferenceMachine();
     boolean result = machine->parseWatCode(machine, watCode);
-    machine->destroy(machine);
-    NSystemUtils.free(machine);
+    machine->destroyAndFree(machine);
 
     NSystemUtils.logI("Parsing result", "%s\n", (result==1 ? "True" : "False"));
 
