@@ -25,7 +25,20 @@ static void prepareCC() {
 
     cc = NCC_createNCC();
 
-    // Elements,
+    // Not all WAT syntactic sugar features are implement. Maybe we can implement them at some point
+    // in the future. Note that the text form is only implemented for convenience in learning and
+    // debugging. The binary format should be much easier to parse and actually use, and should be
+    // the form to be actually shipped in non-reference machines.
+    //
+    // Omitted features:
+    //   - Implicit imports and exports.
+    //   - Named parameters/locals/labels.
+    //   - Folded and nested instructions.
+    //   - Folded block instructions (if/then/else).
+    //
+    // For extensive examples of WAT code, see: https://github.com/mdn/webassembly-examples
+
+    // Basic elements,
     NCC_addRule(cc, "Empty", "", 0, False);
     NCC_addRule(cc, "WhiteSpace", "{\\ |\t|\r|\n}^*", 0, False);
     NCC_addRule(cc, "NotWhiteSpaceLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\xff", 0, False);
@@ -35,6 +48,9 @@ static void prepareCC() {
     NCC_addRule(cc, "", "{${WhiteSpace}|${BlockComment}}^*", 0, False);
     NCC_addRule(cc, "Integer", "0-9 | 1-9 0-9^*", 0, False);
     NCC_addRule(cc, "Identifier", "\\$${NotWhiteSpaceLiteral}^*", 0, False);
+    NCC_addRule(cc, "DataType", "{i32}|{i64}|{f32}|{f64}", 0, False);
+    NCC_addRule(cc, "Parameters", "(${} param ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False);
+    NCC_addRule(cc, "Result", "(${} result ${} ${DataType} ${})", 0, False);
 
     /*
     // Instructions,
@@ -59,19 +75,85 @@ static void prepareCC() {
     */
 
     // Structures,
+
     // Type,
-    //     Example:
+    //     Examples:
     //         (type (;0;) (func))
     //         (type (;1;) (func (param i32 i32 i64)))
     //         (type (;1;) (func (param i32 i32 i64) (result i32)))
-    NCC_addRule(cc, "DataType", "{i32}|{i64}|{f32}|{f64}", 0, False);
-    NCC_addRule(cc, "Parameters", "(${} param ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False);
-    NCC_addRule(cc, "Result", "(${} result ${} ${DataType} ${})", 0, False);
-    NCC_addRule(cc, "FunctionType", "(${} func ${} ${Parameters}|${Empty} ${} ${Result}|${Empty})", 0, False);
-    NCC_addRule(cc, "Type", "(${} type ${} ${FunctionType} ${})", 0, False);
+    NCC_addRule(cc, "Type->Func", "(${} func ${} ${Parameters}|${Empty} ${} ${Result}|${Empty})", 0, False);
+    NCC_addRule(cc, "Type", "(${} type ${} ${Type->Func} ${})", 0, False);
+
+    // Function,
+    //     Example 1:
+    //         (func $__wasm_call_ctors (type 0))
+    //
+    //     Example 2:
+    //         (func $initialize (type 4) (param i32)
+    //           block  ;; label = @1
+    //             local.get 0
+    //             i32.eqz
+    //             br_if 0 (;@1;)
+    //             local.get 0
+    //             call_indirect (type 0)
+    //           end)
+    //
+    //     Example 3:
+    //         (func $strlen (type 6) (param i32) (result i32)
+    //           (local i32 i32 i32)
+    //           i32.const 0
+    //           local.set 1
+    //           loop  ;; label = @1
+    //             local.get 0
+    //             local.get 1
+    //             i32.add
+    //             local.set 2
+    //             local.get 1
+    //             i32.const 1
+    //             i32.add
+    //             local.tee 3
+    //             local.set 1
+    //             local.get 2
+    //             i32.load8_u
+    //             br_if 0 (;@1;)
+    //           end
+    //           local.get 3
+    //           i32.const -1
+    //           i32.add)
+    //
+    //     Example 4 (implicit import, not implemented):
+    //         (func $i (import "imports" "imported_func") (param i32))
+    //
+    //     Example 5 (implicit export, not implemented):
+    //         (func (export "exported_func")
+    //           i32.const 42
+    //           call $i))
+    //
+    //     Example 6 (named parameters/locals/labels, folded and nested instructions implemented):
+    //         (func (export "accumulate") (param $ptr i32) (param $len i32) (result i32)
+    //           (local $end i32)
+    //           (local $sum i32)
+    //           (local.set $end (i32.add (local.get $ptr) (i32.mul (local.get $len) (i32.const 4))))
+    //           (block $break (loop $top
+    //             (br_if $break (i32.eq (local.get $ptr) (local.get $end)))
+    //             (local.set $sum (i32.add (local.get $sum)
+    //                                      (i32.load (local.get $ptr))))
+    //               (local.set $ptr (i32.add (local.get $ptr) (i32.const 4)))
+    //               (br $top)
+    //           ))
+    //           (local.get $sum))
+    NCC_addRule(cc, "Func->Type", "(${} type ${} ${Integer} ${})", 0, False);
+    NCC_addRule(cc, "Func->Local", "(${} local ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False);
+    NCC_addRule(cc, "Func", "(${} func ${} ${Identifier} ${}"
+                            "${Func->Type} |${Empty} ${}"
+                            "${Parameters} |${Empty} ${}"
+                            "${Result}     |${Empty} ${}"
+                            "${Func->Local}|${Empty} ${})", printMatch, False);
+
+    // ...xxxx
 
     // Module,
-    NCC_addRule(cc, "ModuleElement", "${Type}", printMatch, False);
+    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func}", printMatch, False);
     NCC_addRule(cc, "Module", "(${} module ${} {${ModuleElement}${}}^*)", 0, False);
 
     // Document,

@@ -7,9 +7,12 @@ void NMain(int argc, char *argv[]) {
 
     char watCode[] =
             "(module\n"
-            "  (type (;0;) (func))"
-            "  (type (;1;) (func (param i32 i32 i64)))"
-            "  (type (;1;) (func (param i32 i32 i64) (result i32)))"
+            "  (type (;0;) (func))\n"
+            "  (type (;1;) (func (param i32 i32 i64)))\n"
+            "  (type (;10;) (func (param i32 i32 i64) (result i32)))\n"
+            "  (func $__wasm_call_ctors (type 0))\n"
+            "  (func $initialize (type 4) (param i32))\n"
+            "  (func $strlen (type 6) (param i32) (result i32) (local i32 i32 i32))\n"
             ")";
 
     struct NWM_WasmMachine* machine = NWM.createReferenceMachine();
