@@ -35,46 +35,86 @@ static void prepareCC() {
     //   - Named parameters/locals/labels.
     //   - Folded and nested instructions.
     //   - Folded block instructions (if/then/else).
+    //   - Named function types (signatures). See: https://stackoverflow.com/a/45714992
     //
     // For extensive examples of WAT code, see: https://github.com/mdn/webassembly-examples
+    // and: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format
 
-    // Basic elements,
+    /////////////////////////////////////////////////////////////////////////////
+    // Basic elements
+    /////////////////////////////////////////////////////////////////////////////
+
     NCC_addRule(cc, "Empty", "", 0, False);
     NCC_addRule(cc, "WhiteSpace", "{\\ |\t|\r|\n}^*", 0, False);
     NCC_addRule(cc, "NotWhiteSpaceLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\xff", 0, False);
     NCC_addRule(cc, "LineEnd", "\n|${Empty}", 0, False);
     NCC_addRule(cc, "LineComment", ";;*${LineEnd}", 0, False);
     NCC_addRule(cc, "BlockComment", "(;*;)", 0, False);
-    NCC_addRule(cc, "", "{${WhiteSpace}|${BlockComment}}^*", 0, False);
-    NCC_addRule(cc, "Integer", "0-9 | 1-9 0-9^*", 0, False);
+    NCC_addRule(cc, "", "{${WhiteSpace}|${LineComment}|${BlockComment}}^*", 0, False);
+    NCC_addRule(cc, "PositiveInteger", "0 | 1-9 0-9^*", 0, False);
+    NCC_addRule(cc, "Integer", "0 | {\\-|${Empty} 1-9 0-9^*}", 0, False);
     NCC_addRule(cc, "Identifier", "\\$${NotWhiteSpaceLiteral}^*", 0, False);
     NCC_addRule(cc, "DataType", "{i32}|{i64}|{f32}|{f64}", 0, False);
     NCC_addRule(cc, "Parameters", "(${} param ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False);
     NCC_addRule(cc, "Result", "(${} result ${} ${DataType} ${})", 0, False);
+    NCC_addRule(cc, "FuncType", "(${} type ${} ${PositiveInteger} ${})", 0, False);
 
-    /*
-    // Instructions,
-    NCC_addRule(ncc, "Push", "push ${WhiteSpace} ${StackModifier} ${WhiteSpace} ${Integer}", pushListener, False);
-    NCC_addRule(ncc, "Pop" , "pop  ${WhiteSpace} ${StackModifier} ${WhiteSpace} ${Integer}",  popListener, False);
-    NCC_addRule(ncc, "Add", "add", addListener, False);
-    NCC_addRule(ncc, "Sub", "sub", subListener, False);
-    NCC_addRule(ncc, "And", "and", andListener, False);
-    NCC_addRule(ncc, "Or" , "or" ,  orListener, False);
-    NCC_addRule(ncc, "Eq" , "eq" ,  eqListener, False);
-    NCC_addRule(ncc, "LT" , "lt" ,  ltListener, False);
-    NCC_addRule(ncc, "GT" , "gt" ,  gtListener, False);
-    NCC_addRule(ncc, "Neg", "neg", negListener, False);
-    NCC_addRule(ncc, "Not", "not", notListener, False);
-    NCC_addRule(ncc, "Jmp", "goto ${WhiteSpace} ${Identifier}", jumpListener, False);
-    NCC_addRule(ncc, "JNZ", "if\\-goto ${WhiteSpace} ${Identifier}", jumpNotZeroListener, False);
-    NCC_addRule(ncc, "Function", "function ${WhiteSpace} ${Identifier} ${WhiteSpace} ${Integer}", functionListener, False);
-    NCC_addRule(ncc, "Return", "return", returnListener, False);
-    NCC_addRule(ncc, "Call", "call ${WhiteSpace} ${Identifier} ${WhiteSpace} ${Integer}", callListener, False);
+    /////////////////////////////////////////////////////////////////////////////
+    // Instructions
+    /////////////////////////////////////////////////////////////////////////////
 
-    NCC_addRule(ncc, "Instruction", "${Push} | ${Pop} | ${Add} | ${Sub} | ${And} | ${Or} | ${Eq} | ${LT} | ${GT} | ${Neg} | ${Not} | ${Jmp} | ${JNZ} | ${Function} | ${Return} | ${Call}", 0, False);
-    */
+    // Examples:
+    //     i32.const 0
+    //     i32.add
+    //     block  ;; label = @1
+    //     local.get 0
+    //     i32.eqz
+    //     br_if 0 (;@1;)
+    //     call_indirect (type 0)
+    //     end
+    //
+    // See: https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
 
+    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , 0, False);
+    NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u"                     , 0, False);
+    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", 0, False);
+    NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}", 0, False);
+    NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}", 0, False); // The same as set, but doesn't consume the value from the stack.
+    NCC_addRule(cc, "I-i32.add"      , "i32.add"                         , 0, False);
+    NCC_addRule(cc, "I-i32.and"      , "i32.and"                         , 0, False);
+    NCC_addRule(cc, "I-loop"         , "loop"                            , 0, False);
+    NCC_addRule(cc, "I-block"        , "block"                           , 0, False);
+    NCC_addRule(cc, "I-end"          , "end"                             , 0, False);
+    NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                          , 0, False);
+    NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                         , 0, False);
+    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"       , 0, False);
+    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"    , 0, False);
+    NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${FuncType}"   , 0, False);  // The function type is needed for type checking only.
+                                                                                       // The indirect call pops the desired function index
+                                                                                       // from the stack, or from a nested instruction.
+    NCC_addRule(cc, "I-return"       , "return"                          , 0, False);
+
+
+    NCC_addRule(cc, "Instruction", "${I-i32.const}     |"
+                                   "${I-i32.load8_u}   |"
+                                   "${I-local.get}     |"
+                                   "${I-local.set}     |"
+                                   "${I-local.tee}     |"
+                                   "${I-i32.add}       |"
+                                   "${I-i32.and}       |"
+                                   "${I-loop}          |"
+                                   "${I-block}         |"
+                                   "${I-end}           |"
+                                   "${I-i32.eq}        |"
+                                   "${I-i32.eqz}       |"
+                                   "${I-br}            |"
+                                   "${I-br_if}         |"
+                                   "${I-call_indirect} |"
+                                   "${I-return}         ", 0, False);
+
+    /////////////////////////////////////////////////////////////////////////////
     // Structures,
+    /////////////////////////////////////////////////////////////////////////////
 
     // Type,
     //     Examples:
@@ -142,15 +182,13 @@ static void prepareCC() {
     //               (br $top)
     //           ))
     //           (local.get $sum))
-    NCC_addRule(cc, "Func->Type", "(${} type ${} ${Integer} ${})", 0, False);
     NCC_addRule(cc, "Func->Local", "(${} local ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False);
     NCC_addRule(cc, "Func", "(${} func ${} ${Identifier} ${}"
-                            "${Func->Type} |${Empty} ${}"
+                            "${FuncType} |${Empty} ${}"
                             "${Parameters} |${Empty} ${}"
                             "${Result}     |${Empty} ${}"
-                            "${Func->Local}|${Empty} ${})", printMatch, False);
-
-    // ...xxxx
+                            "${Func->Local}|${Empty} ${}"
+                            "{${Instruction} ${}}^*)", 0, False);
 
     // Module,
     NCC_addRule(cc, "ModuleElement", "${Type} | ${Func}", printMatch, False);
@@ -183,7 +221,14 @@ static boolean parseWatCode(struct NWM_WasmMachine *machine, const char* watCode
     int32_t matchLength = NCC_match(cc, watCode);
     NLOGW("", "Match length: %d", matchLength);
 
-    return matchLength == NCString.length(watCode);
+    boolean success = (matchLength == NCString.length(watCode));
+    if (!success) {
+        // TODO: Note the matched length before failing to match (only take into account substitute nodes...
+        // NLOGE("ReferenceMachine", "parseWatCode(): couldn't parse: %s%s%s", NTCOLOR(HIGHLIGHT), &watCode[maxMatchLength], NTCOLOR(STREAM_DEFAULT));
+        return False;
+    }
+
+    return True;
 }
 
 struct NWM_WasmMachine *NWM_initializeReferenceMachine(struct NWM_WasmMachine *outputMachine) {
