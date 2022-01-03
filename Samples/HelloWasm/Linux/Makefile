@@ -5,7 +5,7 @@ INCLUDES = \
     -I../../../Src/Includes/ \
     -I../../../NOMoneCC/Src/Includes/ \
     -I../../../NOMoneCC/Src/NOMoneStdLib/Includes/
-CFLAGS = $(INCLUDES) -DDESKTOP -DNVERBOSE=1 -DNPROFILE_MEMORY=1 -g -MMD# g=>generate debug info. MMD=>generate dependency files.
+CFLAGS = $(INCLUDES) -DDESKTOP -DNVERBOSE=1 -DNPROFILE_MEMORY=3 -g -MMD# g=>generate debug info. MMD=>generate dependency files.
 
 # Clang is more picky. Using it can help us pin-point more issues.
 CC = clang
