@@ -109,6 +109,7 @@ void NMain(int argc, char *argv[]) {
             "    i32.add\n"
             "    i32.load8_u\n"
             "    i32.eqz)\n"
+            "  (table (;0;) 62 funcref)\n"
             ")\n";
 
     struct NWM_WasmMachine* machine = NWM.createReferenceMachine();

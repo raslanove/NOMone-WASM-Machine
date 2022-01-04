@@ -190,9 +190,34 @@ static void prepareCC() {
                             "${Func->Local}|${Empty} ${}"
                             "{${Instruction} ${}}^*)", 0, False);
 
+    // Table,
+    //     Example:
+    //         (table (;0;) 62 62 funcref)  ;; 62 is the number for functions we have. Here, it defines
+    //                                      ;; the limits of the table (min and max sizes).
+    //
+    // See: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#webassembly_tables
+    NCC_addRule(cc, "Table->minSize", "${PositiveInteger}", 0, False);
+    NCC_addRule(cc, "Table->maxSize", "${PositiveInteger}", 0, False);
+    NCC_addRule(cc, "Table", "(${} table ${} ${Table->minSize}|${Empty} ${} ${Table->maxSize} ${} funcref ${})", printMatch, False);
+
+    // TODO:...xxx
+
+    // Global,
+    // TODO:...xxx
+
+    // Export,
+    // TODO:...xxx
+
+    // Element,
+    // TODO:...xxx
+
+    // Data,
+    // TODO:...xxx
+
     // Module,
-    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func}", printMatch, False);
-    NCC_addRule(cc, "Module", "(${} module ${} {${ModuleElement}${}}^*)", 0, False);
+    NCC_addRule(cc, "ModuleStart", "${Empty}", printMatch, False);
+    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func} | ${Table}", printMatch, False);
+    NCC_addRule(cc, "Module", "(${} module ${} ${ModuleStart} {${ModuleElement}${}}^*)", 0, False);
 
     // Document,
     //NCC_addRule(ncc, "Document", "{${WhiteSpace} | ${LineComment} | ${Label} | ${Instruction}}^*", 0, True);
