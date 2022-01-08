@@ -110,6 +110,12 @@ void NMain(int argc, char *argv[]) {
             "    i32.load8_u\n"
             "    i32.eqz)\n"
             "  (table (;0;) 62 funcref)\n"
+            "  (memory (;0;) 2)\n"
+            "  (global (;0;) (mut i32) (i32.const 68272))\n"
+            "  (global (;1;) i32 (i32.const 1024))\n"
+            "  (export \"memory\" (memory 0))\n"
+            "  (export \"__wasm_call_ctors\" (func $__wasm_call_ctors))\n"
+            "  (export \"NSystem\" (global 1))\n"
             ")\n";
 
     struct NWM_WasmMachine* machine = NWM.createReferenceMachine();

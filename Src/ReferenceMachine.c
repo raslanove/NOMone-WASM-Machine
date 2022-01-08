@@ -39,12 +39,15 @@ static void prepareCC() {
     //
     // For extensive examples of WAT code, see: https://github.com/mdn/webassembly-examples
     // and: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format
+    //
+    // For more information on how WASM works in Firefox, see: https://hacks.mozilla.org/category/webassembly/
 
     /////////////////////////////////////////////////////////////////////////////
     // Basic elements
     /////////////////////////////////////////////////////////////////////////////
 
     NCC_addRule(cc, "Empty", "", 0, False);
+    NCC_addRule(cc, "Literal", "\x01-\xff", 0, False);
     NCC_addRule(cc, "WhiteSpace", "{\\ |\t|\r|\n}^*", 0, False);
     NCC_addRule(cc, "NotWhiteSpaceLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\xff", 0, False);
     NCC_addRule(cc, "LineEnd", "\n|${Empty}", 0, False);
@@ -53,7 +56,11 @@ static void prepareCC() {
     NCC_addRule(cc, "", "{${WhiteSpace}|${LineComment}|${BlockComment}}^*", 0, False);
     NCC_addRule(cc, "PositiveInteger", "0 | 1-9 0-9^*", 0, False);
     NCC_addRule(cc, "Integer", "0 | {\\-|${Empty} 1-9 0-9^*}", 0, False);
-    NCC_addRule(cc, "Identifier", "\\$${NotWhiteSpaceLiteral}^*", 0, False);
+    // TODO: float......xxxx
+    NCC_addRule(cc, "String", "\" { ${Literal}|{\\\\${Literal}} }^* \"", 0, False);
+    // Note: maybe it's better to specify the supported ranges instead of excluding the unsupported ones?
+    NCC_addRule(cc, "IdentifierLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\x27 | \x2b-\xff", 0, False); // Note, characters like '*', ' ' and '-' must be escaped before being used in a literal-range expression.
+    NCC_addRule(cc, "Identifier", "\\$${IdentifierLiteral}^*", 0, False);
     NCC_addRule(cc, "DataType", "{i32}|{i64}|{f32}|{f64}", 0, False);
     NCC_addRule(cc, "Parameters", "(${} param ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False);
     NCC_addRule(cc, "Result", "(${} result ${} ${DataType} ${})", 0, False);
@@ -198,17 +205,33 @@ static void prepareCC() {
     // See: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#webassembly_tables
     NCC_addRule(cc, "Table->minSize", "${PositiveInteger}", 0, False);
     NCC_addRule(cc, "Table->maxSize", "${PositiveInteger}", 0, False);
-    NCC_addRule(cc, "Table", "(${} table ${} ${Table->minSize}|${Empty} ${} ${Table->maxSize} ${} funcref ${})", printMatch, False);
+    NCC_addRule(cc, "Table", "(${} table ${} ${Table->minSize}|${Empty} ${} ${Table->maxSize} ${} funcref ${})", 0, False);
 
-    // TODO:...xxx
+    // Memory,
+    NCC_addRule(cc, "Memory->pagesCount", "${PositiveInteger}", 0, False);
+    NCC_addRule(cc, "Memory", "(${} memory ${} ${Memory->pagesCount} ${})", 0, False);
 
     // Global,
-    // TODO:...xxx
+    //     Examples:
+    //         (global (;0;) (mut i32) (i32.const 68272))
+    //         (global (;1;) i32 (i32.const 1024))
+    NCC_addRule(cc, "Global->mutable", "(${} mut ${} ${DataType} ${})", 0, False);
+    NCC_addRule(cc, "Global->value", "(${} ${DataType}.const ${} ${Integer} ${})", 0, False); // TODO: support float. Add two cases, integerType+integerValue and floatType+floatValue...
+    NCC_addRule(cc, "Global", "(${} global ${} ${DataType}|${Global->mutable} ${} ${Global->value} ${})", 0, False);
 
     // Export,
-    // TODO:...xxx
+    //     Examples:
+    //         (export "memory" (memory 0))
+    //         (export "NSystem" (global 1))
+    //         (export "__wasm_call_ctors" (func $__wasm_call_ctors))
+    NCC_addRule(cc, "MemoryIndex", "(${} memory ${} ${PositiveInteger} ${})", 0, False);
+    NCC_addRule(cc, "GlobalIndex", "(${} global ${} ${PositiveInteger} ${})", 0, False);
+    NCC_addRule(cc, "FuncName", "(${} func ${} ${Identifier} ${})", 0, False);
+    NCC_addRule(cc, "Export", "(${} export ${} ${String} ${} ${MemoryIndex}|${GlobalIndex}|${FuncName} ${})", 0, False);
 
     // Element,
+    //     Example:
+    //         (elem (;0;) (i32.const 1) func $initialize $terminate $strlen)
     // TODO:...xxx
 
     // Data,
@@ -216,7 +239,7 @@ static void prepareCC() {
 
     // Module,
     NCC_addRule(cc, "ModuleStart", "${Empty}", printMatch, False);
-    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func} | ${Table}", printMatch, False);
+    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func} | ${Table} | ${Memory} | ${Global} | ${Export}", printMatch, False);
     NCC_addRule(cc, "Module", "(${} module ${} ${ModuleStart} {${ModuleElement}${}}^*)", 0, False);
 
     // Document,
