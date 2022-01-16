@@ -7,9 +7,9 @@
 
 #include <NCC.h>
 
-// TODO: have a separate cc for each machine, to allow multiple machines concurrent action...
-static struct NCC* cc=0;
-static int32_t machinesCount=0;
+struct ReferenceMachineData {
+    struct NCC* cc;
+};
 
 static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     NLOGI("ReferenceMachine", "ruleName: %s, variablesCount: %d", NString.get(ruleName), variablesCount);
@@ -21,9 +21,9 @@ static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variab
     NLOGI("", "");
 }
 
-static void prepareCC() {
+static struct NCC* prepareCC() {
 
-    cc = NCC_createNCC();
+    struct NCC* cc = NCC_createNCC();
 
     // Not all WAT syntactic sugar features are implement. Maybe we can implement them at some point
     // in the future. Note that the text form is only implemented for convenience in learning and
@@ -248,18 +248,15 @@ static void prepareCC() {
 
     // Document,
     NCC_addRule(cc, "Document", "${} ${Module} ${} {${Module} ${}}^*", 0, True, False);
-}
 
-static void destroyCC() {
-    NCC_destroyAndFreeNCC(cc);
-    cc = 0;
+    return cc;
 }
-
 
 static void destroyReferenceMachine(struct NWM_WasmMachine *machine) {
     machine->alive = False;
-    machinesCount--;
-    if (!machinesCount) destroyCC();
+    struct ReferenceMachineData* machineData = machine->data;
+    NCC_destroyAndFreeNCC(machineData->cc);
+    NFREE(machineData, "ReferenceMachine.destroyReferenceMachine() machineData");
 }
 
 static void destroyAndFreeReferenceMachine(struct NWM_WasmMachine *machine) {
@@ -269,7 +266,8 @@ static void destroyAndFreeReferenceMachine(struct NWM_WasmMachine *machine) {
 
 static boolean parseWatCode(struct NWM_WasmMachine *machine, const char* watCode) {
 
-    int32_t matchLength = NCC_match(cc, watCode);
+    struct ReferenceMachineData* machineData = machine->data;
+    int32_t matchLength = NCC_match(machineData->cc, watCode);
     NLOGW("", "Match length: %d", matchLength);
 
     boolean success = (matchLength == NCString.length(watCode));
@@ -291,9 +289,10 @@ struct NWM_WasmMachine *NWM_initializeReferenceMachine(struct NWM_WasmMachine *o
     outputMachine->destroyAndFree = destroyAndFreeReferenceMachine;
     outputMachine->parseWatCode = parseWatCode;
 
-    // Prepare CC,
-    if (!cc) prepareCC();
-    machinesCount++;
+    // Initialize machine data,
+    struct ReferenceMachineData* machineData = NMALLOC(sizeof(struct ReferenceMachineData), "ReferenceMachine.NWM_initializeReferenceMachine() machineData");
+    machineData->cc = prepareCC();
+    outputMachine->data = machineData;
 
     return outputMachine;
 }

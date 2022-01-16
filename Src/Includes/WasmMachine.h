@@ -4,6 +4,8 @@
 
 struct NWM_WasmMachine {
     boolean alive;
+    void* data;
+
     void (*destroy)(struct NWM_WasmMachine *machine);
     void (*destroyAndFree)(struct NWM_WasmMachine *machine);
     boolean (*parseWatCode)(struct NWM_WasmMachine *machine, const char *watCode);
