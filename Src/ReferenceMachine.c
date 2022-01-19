@@ -7,9 +7,92 @@
 
 #include <NCC.h>
 
+///////////////////////////////////////////////////////////////////////////
+// Types
+///////////////////////////////////////////////////////////////////////////
+
+typedef enum { TYPE_NONE, TYPE_INT32, TYPE_INT64, TYPE_FLOAT32, TYPE_FLOAT64 } DataType; // We can have a void return value.
+typedef enum { TYPE_MEMORY, TYPE_GLOBAL, TYPE_FUNC } ExportType;
+typedef enum {
+    INST_i32_const,
+    INST_i32_load8_u,
+    INST_local_get,
+    INST_local_set,
+    INST_local_tee,
+    INST_i32_add,
+    INST_i32_and,
+    INST_loop,
+    INST_block,
+    INST_end,
+    INST_i32_eq,
+    INST_i32_eqz,
+    INST_br,
+    INST_br_if,
+    INST_call_indirect,
+    INST_return
+} InstructionType;
+
+union Value {
+    int32_t int32;
+    int64_t int64;
+    float float32;
+    double float64;
+};
+
+struct Type {
+    struct NVector parameterTypes;
+    DataType resultType;
+};
+
+struct Instruction {
+    InstructionType type;
+    union Value argument;
+};
+
+struct Function {
+    uint32_t typeIndex;
+    struct NString name;
+    struct NVector localVariablesTypes;
+    struct NVector instructions;
+};
+
+struct Table {
+    struct NVector functions;
+};
+
+struct Memory {
+    struct NByteVector data;
+};
+
+struct Global {
+    DataType type;
+    union Value value;
+};
+
+struct Export {
+    ExportType type;
+    uint32_t index;
+};
+
+struct Module {
+    struct Memory* memory;        // Could be imported from another machine (or parent code).
+    struct Table* functionsTable; // Could be imported from another machine (or parent code).
+    boolean memoryImported, tableImported;
+
+    struct NVector types;
+    struct NVector functions;
+    struct NVector globals;
+    struct NVector exports;
+};
+
 struct ReferenceMachineData {
     struct NCC* cc;
+    struct NVector modules;
 };
+
+///////////////////////////////////////////////////////////////////////////
+// Reference machine population
+///////////////////////////////////////////////////////////////////////////
 
 static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     NLOGI("ReferenceMachine", "ruleName: %s, variablesCount: %d", NString.get(ruleName), variablesCount);
@@ -20,6 +103,47 @@ static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variab
     }
     NLOGI("", "");
 }
+
+static struct Module* createModule() {
+
+    struct Module* module = NMALLOC(sizeof(struct Module), "ReferenceMachine.createModule() module");
+    NSystemUtils.memset(module, 0, sizeof(struct Module));
+
+    NVector.initialize(&module->types    , 0, sizeof(struct Type*    ));
+    NVector.initialize(&module->functions, 0, sizeof(struct Function*));
+    NVector.initialize(&module->globals  , 0, sizeof(struct Global*  ));
+    NVector.initialize(&module->exports  , 0, sizeof(struct Export*  ));
+
+    return module;
+}
+
+static void destroyAndFreeModule(struct Module* module) {
+
+    // TODO: destroy memory...
+    if (!module->memoryImported) {}
+    // TODO: destroy table...
+    if (!module->tableImported) {}
+
+    NVector.destroy(&module->types    );
+    NVector.destroy(&module->functions);
+    NVector.destroy(&module->globals  );
+    NVector.destroy(&module->exports  );
+
+    NFREE(module, "ReferenceMachine.destroyAndFreeModule() module");
+}
+
+static void onModuleStart(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    struct ReferenceMachineData* referenceMachineData = ncc->extraData;
+
+    // Create a new module,
+    struct Module* module = createModule();
+    NVector.pushBack(&referenceMachineData->modules, &module);
+    //printMatch(ncc, ruleName, variablesCount);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Language definition
+///////////////////////////////////////////////////////////////////////////
 
 static struct NCC* prepareCC() {
 
@@ -242,8 +366,8 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "Data", "(${} data ${} ${MemoryOffset} ${} ${String} ${})", 0, False, True);
 
     // Module,
-    NCC_addRule(cc, "ModuleStart", "${Empty}", 0, False, True);
-    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func} | ${Table} | ${Memory} | ${Global} | ${Export} | ${Element} | ${Data}", printMatch, False, False);
+    NCC_addRule(cc, "ModuleStart", "${Empty}", onModuleStart, False, False);
+    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func} | ${Table} | ${Memory} | ${Global} | ${Export} | ${Element} | ${Data}", 0, False, False);
     NCC_addRule(cc, "Module", "(${} module ${} ${ModuleStart} {${ModuleElement}${}}^*)", 0, False, False);
 
     // Document,
@@ -252,9 +376,18 @@ static struct NCC* prepareCC() {
     return cc;
 }
 
+///////////////////////////////////////////////////////////////////////////
+// Reference machine interface
+///////////////////////////////////////////////////////////////////////////
+
 static void destroyReferenceMachine(struct NWM_WasmMachine *machine) {
     machine->alive = False;
+
     struct ReferenceMachineData* machineData = machine->data;
+    struct Module* module;
+    while (NVector.popBack(&machineData->modules, &module)) destroyAndFreeModule(module);
+    NVector.destroy(&machineData->modules);
+
     NCC_destroyAndFreeNCC(machineData->cc);
     NFREE(machineData, "ReferenceMachine.destroyReferenceMachine() machineData");
 }
@@ -291,7 +424,9 @@ struct NWM_WasmMachine *NWM_initializeReferenceMachine(struct NWM_WasmMachine *o
 
     // Initialize machine data,
     struct ReferenceMachineData* machineData = NMALLOC(sizeof(struct ReferenceMachineData), "ReferenceMachine.NWM_initializeReferenceMachine() machineData");
+    NVector.initialize(&machineData->modules, 0, sizeof(struct Module*));
     machineData->cc = prepareCC();
+    machineData->cc->extraData = machineData;
     outputMachine->data = machineData;
 
     return outputMachine;
