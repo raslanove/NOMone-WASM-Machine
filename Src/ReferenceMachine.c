@@ -103,7 +103,7 @@ struct ParsingData {
 static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     NLOGI("ReferenceMachine", "ruleName: %s, variablesCount: %d", NString.get(ruleName), variablesCount);
     struct NCC_Variable variable;
-    while (NCC_popVariable(ncc, &variable)) {
+    while (NCC_popRuleVariable(ncc, &variable)) {
         NLOGI("ReferenceMachine", "            Name: %s%s%s, Value: %s%s%s", NTCOLOR(HIGHLIGHT), NString.get(&variable.name), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
         NCC_destroyVariable(&variable);
     }
@@ -115,7 +115,16 @@ static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variab
 ///////////////////////////////////////////////////////////////////////////
 
 static void onType_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    printMatch(ncc, ruleName, variablesCount);
+    NLOGI("ReferenceMachine", "ruleName: %s, variablesCount: %d", NString.get(ruleName), variablesCount);
+    for (int32_t i=0; i<variablesCount; i++) {
+        struct NCC_Variable variable;
+        NCC_getRuleVariable(ncc, i, &variable);
+        NLOGI("ReferenceMachine", "            Name: %s%s%s, Value: %s%s%s", NTCOLOR(HIGHLIGHT), NString.get(&variable.name), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
+    }
+    NCC_discardRuleVariables(ncc);
+
+    // TODO: push into the type parameters...
+    // ...xxx
 }
 
 static void onType_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {

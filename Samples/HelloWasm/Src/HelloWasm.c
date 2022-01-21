@@ -9,7 +9,7 @@ void NMain(int argc, char *argv[]) {
     char watCode[] =
             "(module\n"
             "  (type (;0;) (func))\n"
-            "  (type (;1;) (func (param i32 i32 i32) (result i32)))\n"
+            "  (type (;1;) (func (param i32 i32 f64) (result i32)))\n"
             "  (type (;2;) (func (param i32 i32)))\n"
             "  (type (;3;) (func (param i32 i32) (result i32)))\n"
             "  (type (;4;) (func (param i32)))\n"
