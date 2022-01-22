@@ -13,7 +13,7 @@
 // Types
 ///////////////////////////////////////////////////////////////////////////
 
-typedef enum { TYPE_NONE, TYPE_INT32, TYPE_INT64, TYPE_FLOAT32, TYPE_FLOAT64 } DataType; // We can have a void return value.
+typedef enum { TYPE_NONE=0, TYPE_INT32, TYPE_INT64, TYPE_FLOAT32, TYPE_FLOAT64 } DataType; // We can have a void return value.
 typedef enum { TYPE_MEMORY, TYPE_GLOBAL, TYPE_FUNC } ExportType;
 typedef enum {
     INST_i32_const,
@@ -102,11 +102,12 @@ struct ParsingData {
 
 static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     NLOGI("ReferenceMachine", "ruleName: %s, variablesCount: %d", NString.get(ruleName), variablesCount);
-    struct NCC_Variable variable;
-    while (NCC_popRuleVariable(ncc, &variable)) {
+    for (int32_t i=0; i<variablesCount; i++) {
+        struct NCC_Variable variable;
+        NCC_getRuleVariable(ncc, i, &variable);
         NLOGI("ReferenceMachine", "            Name: %s%s%s, Value: %s%s%s", NTCOLOR(HIGHLIGHT), NString.get(&variable.name), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
-        NCC_destroyVariable(&variable);
     }
+    NCC_discardRuleVariables(ncc);
     NLOGI("", "");
 }
 
@@ -114,21 +115,42 @@ static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variab
 // Type
 ///////////////////////////////////////////////////////////////////////////
 
+static DataType getDataTypeFromString(const char* valueString) {
+    if (NCString.equals(valueString, "i32")) {
+        return TYPE_INT32  ;
+    } else if (NCString.equals(valueString, "i64")) {
+        return TYPE_INT64  ;
+    } else if (NCString.equals(valueString, "f32")) {
+        return TYPE_FLOAT32;
+    } else if (NCString.equals(valueString, "f64")) {
+        return TYPE_FLOAT64;
+    }
+    return 0;
+}
+
 static void onType_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    NLOGI("ReferenceMachine", "ruleName: %s, variablesCount: %d", NString.get(ruleName), variablesCount);
+
+    struct ParsingData* parsingData = ncc->extraData;
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+    struct Type* type = *(struct Type**) NVector.getLast(&module->types);
+
+    // Push variable types,
     for (int32_t i=0; i<variablesCount; i++) {
-        struct NCC_Variable variable;
-        NCC_getRuleVariable(ncc, i, &variable);
-        NLOGI("ReferenceMachine", "            Name: %s%s%s, Value: %s%s%s", NTCOLOR(HIGHLIGHT), NString.get(&variable.name), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
+        struct NCC_Variable variable; NCC_getRuleVariable(ncc, i, &variable);
+        DataType parameterType = getDataTypeFromString(NString.get(&variable.value));
+        NVector.pushBack(&type->parameterTypes, &parameterType);
     }
     NCC_discardRuleVariables(ncc);
-
-    // TODO: push into the type parameters...
-    // ...xxx
 }
 
 static void onType_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    printMatch(ncc, ruleName, variablesCount);
+
+    //printMatch(ncc, ruleName, variablesCount);
+    struct ParsingData* parsingData = ncc->extraData;
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+    struct Type* type = *(struct Type**) NVector.getLast(&module->types);
+    struct NCC_Variable variable; NCC_popRuleVariable(ncc, &variable);
+    type->resultType = getDataTypeFromString(NString.get(&variable.value));
 }
 
 static struct Type* createType() {
