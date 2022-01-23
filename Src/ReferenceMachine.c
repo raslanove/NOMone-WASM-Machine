@@ -42,7 +42,7 @@ union Value {
 };
 
 struct Type {
-    struct NVector parameterTypes;
+    struct NVector parameterTypes;   // DataType
     DataType resultType;
 };
 
@@ -52,14 +52,15 @@ struct Instruction {
 };
 
 struct Function {
-    uint32_t typeIndex;
     struct NString name;
-    struct NVector localVariablesTypes;
-    struct NVector instructions;
+    uint32_t typeIndex;
+    struct Type* type;
+    struct NVector localVariablesTypes;  // DataType
+    struct NVector instructions;         // Instruction
 };
 
 struct Table {
-    struct NVector functions;
+    struct NVector functions;            // Function*
 };
 
 struct Memory {
@@ -81,15 +82,15 @@ struct Module {
     struct Table* functionsTable; // Could be imported from another machine (or parent code).
     boolean memoryImported, tableImported;
 
-    struct NVector types;
-    struct NVector functions;
-    struct NVector globals;
-    struct NVector exports;
+    struct NVector types;         // Type*
+    struct NVector functions;     // Function*
+    struct NVector globals;       // Global
+    struct NVector exports;       // Export
 };
 
 struct ReferenceMachineData {
     struct NCC* cc;
-    struct NVector modules;
+    struct NVector modules;       // Module*
 };
 
 struct ParsingData {
@@ -105,9 +106,8 @@ static void printMatch(struct NCC* ncc, struct NString* ruleName, int32_t variab
     for (int32_t i=0; i<variablesCount; i++) {
         struct NCC_Variable variable;
         NCC_getRuleVariable(ncc, i, &variable);
-        NLOGI("ReferenceMachine", "            Name: %s%s%s, Value: %s%s%s", NTCOLOR(HIGHLIGHT), NString.get(&variable.name), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
+        NLOGI("ReferenceMachine", "            Name: %s%s%s, Value: %s%s%s", NTCOLOR(HIGHLIGHT), variable.name, NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
     }
-    NCC_discardRuleVariables(ncc);
     NLOGI("", "");
 }
 
@@ -128,28 +128,30 @@ static DataType getDataTypeFromString(const char* valueString) {
     return 0;
 }
 
-static void onType_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-
-    struct ParsingData* parsingData = ncc->extraData;
-    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
-    struct Type* type = *(struct Type**) NVector.getLast(&module->types);
+static void pushRuleParameterTypes(struct NCC* ncc, int32_t variablesCount, struct NVector* outVector) {
 
     // Push variable types,
     for (int32_t i=0; i<variablesCount; i++) {
         struct NCC_Variable variable; NCC_getRuleVariable(ncc, i, &variable);
         DataType parameterType = getDataTypeFromString(NString.get(&variable.value));
-        NVector.pushBack(&type->parameterTypes, &parameterType);
+        NVector.pushBack(outVector, &parameterType);
     }
-    NCC_discardRuleVariables(ncc);
+}
+
+#define GET_TYPE \
+    struct ParsingData* parsingData = ncc->extraData; \
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
+    struct Type* type = *(struct Type**) NVector.getLast(&module->types)
+
+
+static void onType_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_TYPE;
+    pushRuleParameterTypes(ncc, variablesCount, &type->parameterTypes);
 }
 
 static void onType_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-
-    //printMatch(ncc, ruleName, variablesCount);
-    struct ParsingData* parsingData = ncc->extraData;
-    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
-    struct Type* type = *(struct Type**) NVector.getLast(&module->types);
-    struct NCC_Variable variable; NCC_popRuleVariable(ncc, &variable);
+    GET_TYPE;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     type->resultType = getDataTypeFromString(NString.get(&variable.value));
 }
 
@@ -180,6 +182,91 @@ static void onType_Start(struct NCC* ncc, struct NString* ruleName, int32_t vari
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// Func
+///////////////////////////////////////////////////////////////////////////
+
+#define GET_FUNCTION \
+    struct ParsingData* parsingData = ncc->extraData; \
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
+    struct Function* function = *(struct Function**) NVector.getLast(&module->functions)
+
+static void onFunc_Identifier(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_FUNCTION;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    NString.set(&function->name, "%s", NString.get(&variable.value));
+}
+
+static void onFunc_TypeIndex(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_FUNCTION;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    function->typeIndex = NCString.parseInteger(NString.get(&variable.value));
+}
+
+static void onFunc_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_FUNCTION;
+    if (!function->type) function->type = createType();
+    pushRuleParameterTypes(ncc, variablesCount, &function->type->parameterTypes);
+}
+
+static void onFunc_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_FUNCTION;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    if (!function->type) function->type = createType();
+    function->type->resultType = getDataTypeFromString(NString.get(&variable.value));
+}
+
+static void onFunc_Local(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_FUNCTION;
+    pushRuleParameterTypes(ncc, variablesCount, &function->localVariablesTypes);
+}
+
+static struct Function* createFunction() {
+
+    struct Function* function = NMALLOC(sizeof(struct Function), "ReferenceMachine.createFunction() function");
+    NSystemUtils.memset(function, 0, sizeof(struct Function));
+
+    NString.initialize(&function->name, "");
+    NVector.initialize(&function->localVariablesTypes, 0, sizeof(DataType));
+    NVector.initialize(&function->instructions, 0, sizeof(struct Instruction));
+
+    return function;
+}
+
+static void destroyAndFreeFunction(struct Function* function) {
+    NString.destroy(&function->name);
+    NVector.destroy(&function->localVariablesTypes);
+    NVector.destroy(&function->instructions);
+    if (function->type) destroyAndFreeType(function->type);
+    NFREE(function, "ReferenceMachine.destroyAndFreeFunction() function");
+}
+
+static void onFunc_Start(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+
+    #ifdef NWM_VERBOSE
+    NLOGI("ReferenceMachine", "Func->Start");
+    #endif
+    struct ParsingData* parsingData = ncc->extraData;
+
+    // Create a new function in the current module,
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+
+    struct Function* newFunction = createFunction();
+    NVector.pushBack(&module->functions, &newFunction);
+}
+
+static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    //printMatch(ncc, ruleName, variablesCount);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Instruction
+///////////////////////////////////////////////////////////////////////////
+
+static void onInstruction(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    printMatch(ncc, ruleName, variablesCount);
+}
+
+///////////////////////////////////////////////////////////////////////////
 // Module
 ///////////////////////////////////////////////////////////////////////////
 
@@ -207,8 +294,10 @@ static void destroyAndFreeModule(struct Module* module) {
     struct Type* type; while (NVector.popBack(&module->types, &type)) destroyAndFreeType(type);
     NVector.destroy(&module->types);
 
-
+    // Functions,
+    struct Function* function; while (NVector.popBack(&module->functions, &function)) destroyAndFreeFunction(function);
     NVector.destroy(&module->functions);
+
     NVector.destroy(&module->globals  );
     NVector.destroy(&module->exports  );
 
@@ -256,25 +345,25 @@ static struct NCC* prepareCC() {
     // Basic elements
     /////////////////////////////////////////////////////////////////////////////
 
-    NCC_addRule(cc, "Empty", "", 0, False, False, True);
-    NCC_addRule(cc, "Literal", "\x01-\xff", 0, False, False, True);
-    NCC_addRule(cc, "WhiteSpace", "{\\ |\t|\r|\n}^*", 0, False, False, True);
-    NCC_addRule(cc, "NotWhiteSpaceLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\xff", 0, False, False, True);
-    NCC_addRule(cc, "LineEnd", "\n|${Empty}", 0, False, False, True);
-    NCC_addRule(cc, "LineComment", ";;*${LineEnd}", 0, False, False, True);
-    NCC_addRule(cc, "BlockComment", "(;*;)", 0, False, False, True);
-    NCC_addRule(cc, "", "{${WhiteSpace}|${LineComment}|${BlockComment}}^*", 0, False, False, True);
-    NCC_addRule(cc, "PositiveInteger", "0 | 1-9 0-9^*", 0, False, False, True);
-    NCC_addRule(cc, "Integer", "0 | {\\-|${Empty} 1-9 0-9^*}", 0, False, False, True);
+    NCC_addRule(cc, "Empty", "", 0, False, False, False);
+    NCC_addRule(cc, "Literal", "\x01-\xff", 0, False, False, False);
+    NCC_addRule(cc, "WhiteSpace", "{\\ |\t|\r|\n}^*", 0, False, False, False);
+    NCC_addRule(cc, "NotWhiteSpaceLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\xff", 0, False, False, False);
+    NCC_addRule(cc, "LineEnd", "\n|${Empty}", 0, False, False, False);
+    NCC_addRule(cc, "LineComment", ";;*${LineEnd}", 0, False, False, False);
+    NCC_addRule(cc, "BlockComment", "(;*;)", 0, False, False, False);
+    NCC_addRule(cc, "", "{${WhiteSpace}|${LineComment}|${BlockComment}}^*", 0, False, False, False);
+    NCC_addRule(cc, "PositiveInteger", "0 | 1-9 0-9^*", 0, False, True, False);
+    NCC_addRule(cc, "Integer", "0 | {\\-|${Empty} 1-9 0-9^*}", 0, False, True, False);
     // TODO: float......xxxx
-    NCC_addRule(cc, "String", "\" { ${Literal}|{\\\\${Literal}} }^* \"", 0, False, False, True);
+    NCC_addRule(cc, "String", "\" { ${Literal}|{\\\\${Literal}} }^* \"", 0, False, False, False);
     // Note: maybe it's better to specify the supported ranges instead of excluding the unsupported ones?
-    NCC_addRule(cc, "IdentifierLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\x27 | \x2b-\xff", 0, False, False, True); // Note, characters like '*', ' ' and '-' must be escaped before being used in a literal-range expression.
-    NCC_addRule(cc, "Identifier", "\\$${IdentifierLiteral}^*", 0, False, False, True);
-    NCC_addRule(cc, "DataType", "{i32}|{i64}|{f32}|{f64}", 0, False, True, True);
+    NCC_addRule(cc, "IdentifierLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\x27 | \x2b-\xff", 0, False, False, False); // Note, characters like '*', ' ' and '-' must be escaped before being used in a literal-range expression.
+    NCC_addRule(cc, "Identifier", "\\$${IdentifierLiteral}^*", 0, False, True, False);
+    NCC_addRule(cc, "DataType", "{i32}|{i64}|{f32}|{f64}", 0, False, True, False);
     NCC_addRule(cc, "Parameters", "(${} param ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False, False, False);
     NCC_addRule(cc, "Result", "(${} result ${} ${DataType} ${})", 0, False, False, False);
-    NCC_addRule(cc, "FuncType", "(${} type ${} ${PositiveInteger} ${})", 0, False, False, True);
+    NCC_addRule(cc, "TypeIndex", "(${} type ${} ${PositiveInteger} ${})", 0, False, False, False);
 
     /////////////////////////////////////////////////////////////////////////////
     // Instructions
@@ -292,24 +381,24 @@ static struct NCC* prepareCC() {
     //
     // See: https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
 
-    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , 0, False, False, True);
-    NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u"                     , 0, False, False, True);
-    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", 0, False, False, True);
-    NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}", 0, False, False, True);
-    NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}", 0, False, False, True); // The same as set, but doesn't consume the value from the stack.
-    NCC_addRule(cc, "I-i32.add"      , "i32.add"                         , 0, False, False, True);
-    NCC_addRule(cc, "I-i32.and"      , "i32.and"                         , 0, False, False, True);
-    NCC_addRule(cc, "I-loop"         , "loop"                            , 0, False, False, True);
-    NCC_addRule(cc, "I-block"        , "block"                           , 0, False, False, True);
-    NCC_addRule(cc, "I-end"          , "end"                             , 0, False, False, True);
-    NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                          , 0, False, False, True);
-    NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                         , 0, False, False, True);
-    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"       , 0, False, False, True);
-    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"    , 0, False, False, True);
-    NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${FuncType}"   , 0, False, False, True);  // The function type is needed for type checking only.
+    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , 0, False, False, False);
+    NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u"                     , 0, False, False, False);
+    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", 0, False, False, False);
+    NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}", 0, False, False, False);
+    NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}", 0, False, False, False); // The same as set, but doesn't consume the value from the stack.
+    NCC_addRule(cc, "I-i32.add"      , "i32.add"                         , 0, False, False, False);
+    NCC_addRule(cc, "I-i32.and"      , "i32.and"                         , 0, False, False, False);
+    NCC_addRule(cc, "I-loop"         , "loop"                            , 0, False, False, False);
+    NCC_addRule(cc, "I-block"        , "block"                           , 0, False, False, False);
+    NCC_addRule(cc, "I-end"          , "end"                             , 0, False, False, False);
+    NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                          , 0, False, False, False);
+    NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                         , 0, False, False, False);
+    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"       , 0, False, False, False);
+    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"    , 0, False, False, False);
+    NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${TypeIndex}"  , 0, False, False, False); // The function type is needed for type checking only.
                                                                                                     // The indirect call pops the desired function index
                                                                                                     // from the stack, or from a nested instruction.
-    NCC_addRule(cc, "I-return"       , "return"                          , 0, False, False, True);
+    NCC_addRule(cc, "I-return"       , "return"                          , 0, False, False, False);
 
 
     NCC_addRule(cc, "Instruction", "${I-i32.const}     |"
@@ -327,7 +416,7 @@ static struct NCC* prepareCC() {
                                    "${I-br}            |"
                                    "${I-br_if}         |"
                                    "${I-call_indirect} |"
-                                   "${I-return}         ", 0, False, False, True);
+                                   "${I-return}         ", 0, False, False, False);
 
     /////////////////////////////////////////////////////////////////////////////
     // Structures,
@@ -338,12 +427,11 @@ static struct NCC* prepareCC() {
     //         (type (;0;) (func))
     //         (type (;1;) (func (param i32 i32 i64)))
     //         (type (;1;) (func (param i32 i32 i64) (result i32)))
-    // ...xxx
-    NCC_addRule(cc, "Type->Result", "${Result}", onType_Result, False, False, True);
+    NCC_addRule(cc, "Type->Start", "", onType_Start, False, False, False);
     NCC_addRule(cc, "Type->Parameters", "${Parameters}", onType_Parameters, False, False, True);
-    NCC_addRule(cc, "Type->Func", "(${} func ${} ${Type->Parameters}|${Empty} ${} ${Type->Result}|${Empty})", 0, False, False, True);
-    NCC_addRule(cc, "Type->Start", "${Empty}", onType_Start, False, False, True);
-    NCC_addRule(cc, "Type", "${Type->Start} (${} type ${} ${Type->Func} ${})", 0, False, False, True);
+    NCC_addRule(cc, "Type->Result", "${Result}", onType_Result, False, False, True);
+    NCC_addRule(cc, "Type->Func", "(${} func ${} ${Type->Parameters}|${Empty} ${} ${Type->Result}|${Empty})", 0, False, False, False);
+    NCC_addRule(cc, "Type", "${Type->Start} (${} type ${} ${Type->Func} ${})", 0, False, False, False);
 
     // Function,
     //     Example 1:
@@ -403,13 +491,18 @@ static struct NCC* prepareCC() {
     //               (br $top)
     //           ))
     //           (local.get $sum))
-    NCC_addRule(cc, "Func->Local", "(${} local ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False, False, True);
-    NCC_addRule(cc, "Func", "(${} func ${} ${Identifier} ${}"
-                            "${FuncType} |${Empty} ${}"
-                            "${Parameters} |${Empty} ${}"
-                            "${Result}     |${Empty} ${}"
-                            "${Func->Local}|${Empty} ${}"
-                            "{${Instruction} ${}}^*)", 0, False, True, True);
+    NCC_addRule(cc, "Func->Start", "", onFunc_Start, False, False, False);
+    NCC_addRule(cc, "Func->Identifier", "${Identifier}", onFunc_Identifier, False, False, True);
+    NCC_addRule(cc, "Func->TypeIndex", "${TypeIndex}", onFunc_TypeIndex, False, False, True);
+    NCC_addRule(cc, "Func->Parameters", "${Parameters}", onFunc_Parameters, False, False, True);
+    NCC_addRule(cc, "Func->Result", "${Result}", onFunc_Result, False, False, True);
+    NCC_addRule(cc, "Func->Local", "(${} local ${} ${DataType} ${} {${DataType} ${}}^*)", onFunc_Local, False, False, True);
+    NCC_addRule(cc, "Func", "${Func->Start} (${} func ${} ${Func->Identifier} ${}"
+                            "${Func->TypeIndex}  |${Empty} ${}"
+                            "${Func->Parameters} |${Empty} ${}"
+                            "${Func->Result}     |${Empty} ${}"
+                            "${Func->Local}      |${Empty} ${}"
+                            "{${Instruction} ${}}^*)", onFunc_End, False, False, True);
 
     // Table,
     //     Example:
@@ -417,48 +510,48 @@ static struct NCC* prepareCC() {
     //                                      ;; the limits of the table (min and max sizes).
     //
     // See: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#webassembly_tables
-    NCC_addRule(cc, "Table->minSize", "${PositiveInteger}", 0, False, False, True);
-    NCC_addRule(cc, "Table->maxSize", "${PositiveInteger}", 0, False, False, True);
-    NCC_addRule(cc, "Table", "(${} table ${} ${Table->minSize}|${Empty} ${} ${Table->maxSize} ${} funcref ${})", 0, False, True, True);
+    NCC_addRule(cc, "Table->minSize", "${PositiveInteger}", 0, False, False, False);
+    NCC_addRule(cc, "Table->maxSize", "${PositiveInteger}", 0, False, False, False);
+    NCC_addRule(cc, "Table", "(${} table ${} ${Table->minSize}|${Empty} ${} ${Table->maxSize} ${} funcref ${})", 0, False, True, False);
 
     // Memory,
-    NCC_addRule(cc, "Memory->pagesCount", "${PositiveInteger}", 0, False, False, True);
-    NCC_addRule(cc, "Memory", "(${} memory ${} ${Memory->pagesCount} ${})", 0, False, True, True);
+    NCC_addRule(cc, "Memory->pagesCount", "${PositiveInteger}", 0, False, False, False);
+    NCC_addRule(cc, "Memory", "(${} memory ${} ${Memory->pagesCount} ${})", 0, False, True, False);
 
     // Global,
     //     Examples:
     //         (global (;0;) (mut i32) (i32.const 68272))
     //         (global (;1;) i32 (i32.const 1024))
-    NCC_addRule(cc, "Global->mutable", "(${} mut ${} ${DataType} ${})", 0, False, False, True);
-    NCC_addRule(cc, "Global->value", "(${} ${DataType}.const ${} ${Integer} ${})", 0, False, False, True); // TODO: support float. Add two cases, integerType+integerValue and floatType+floatValue...
-    NCC_addRule(cc, "Global", "(${} global ${} ${DataType}|${Global->mutable} ${} ${Global->value} ${})", 0, False, True, True);
+    NCC_addRule(cc, "Global->mutable", "(${} mut ${} ${DataType} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Global->value", "(${} ${DataType}.const ${} ${Integer} ${})", 0, False, False, False); // TODO: support float. Add two cases, integerType+integerValue and floatType+floatValue...
+    NCC_addRule(cc, "Global", "(${} global ${} ${DataType}|${Global->mutable} ${} ${Global->value} ${})", 0, False, True, False);
 
     // Export,
     //     Examples:
     //         (export "memory" (memory 0))
     //         (export "NSystem" (global 1))
     //         (export "__wasm_call_ctors" (func $__wasm_call_ctors))
-    NCC_addRule(cc, "MemoryIndex", "(${} memory ${} ${PositiveInteger} ${})", 0, False, False, True);
-    NCC_addRule(cc, "GlobalIndex", "(${} global ${} ${PositiveInteger} ${})", 0, False, False, True);
-    NCC_addRule(cc, "FuncName", "(${} func ${} ${Identifier} ${})", 0, False, False, True);
-    NCC_addRule(cc, "Export", "(${} export ${} ${String} ${} ${MemoryIndex}|${GlobalIndex}|${FuncName} ${})", 0, False, True, True);
+    NCC_addRule(cc, "MemoryIndex", "(${} memory ${} ${PositiveInteger} ${})", 0, False, False, False);
+    NCC_addRule(cc, "GlobalIndex", "(${} global ${} ${PositiveInteger} ${})", 0, False, False, False);
+    NCC_addRule(cc, "FuncName", "(${} func ${} ${Identifier} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Export", "(${} export ${} ${String} ${} ${MemoryIndex}|${GlobalIndex}|${FuncName} ${})", 0, False, True, False);
 
     // Element,
     //     Example:
     //         (elem (;0;) (i32.const 1) func $initialize $terminate $strlen)
-    NCC_addRule(cc, "TableOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, True);
-    NCC_addRule(cc, "Element", "(${} elem ${} ${TableOffset}|${Empty} ${} func ${} ${Identifier} ${} {${Identifier} ${}}^*)", 0, False, True, True);
+    NCC_addRule(cc, "TableOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Element", "(${} elem ${} ${TableOffset}|${Empty} ${} func ${} ${Identifier} ${} {${Identifier} ${}}^*)", 0, False, True, False);
 
     // Data,
     //     Example:
     //         (data (;0;) (i32.const 1024) "NCString.parseInteger()\00Integer length can't exceed 10 digits and a sign. Found: %s%s\00\19\09\00\00!\09\00\00\c9\07\00\00\d9\07\00\00\09\09\00\00\f9\08\00\00(module)\00Parsing result\00%s\0a\00True\00False\00"))
-    NCC_addRule(cc, "MemoryOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, True);
-    NCC_addRule(cc, "Data", "(${} data ${} ${MemoryOffset} ${} ${String} ${})", 0, False, True, True);
+    NCC_addRule(cc, "MemoryOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Data", "(${} data ${} ${MemoryOffset} ${} ${String} ${})", 0, False, True, False);
 
     // Module,
-    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func} | ${Table} | ${Memory} | ${Global} | ${Export} | ${Element} | ${Data}", 0, False, False, True);
-    NCC_addRule(cc, "Module->Start", "${Empty}", onModule_Start, False, False, True);
-    NCC_addRule(cc, "Module", "${Module->Start} (${} module ${} {${ModuleElement}${}}^*)", 0, False, False, True);
+    NCC_addRule(cc, "Module->Start", "", onModule_Start, False, False, False);
+    NCC_addRule(cc, "ModuleElement", "${Type} | ${Func} | ${Table} | ${Memory} | ${Global} | ${Export} | ${Element} | ${Data}", 0, False, False, False);
+    NCC_addRule(cc, "Module", "${Module->Start} (${} module ${} {${ModuleElement}${}}^*)", 0, False, False, False);
 
     // Document,
     NCC_addRule(cc, "Document", "${} ${Module} ${} {${Module} ${}}^*", 0, True, False, True);
