@@ -4,6 +4,7 @@
 
 #include <NSystemUtils.h>
 #include <NCString.h>
+#include <NError.h>
 
 #include <NCC.h>
 
@@ -53,7 +54,7 @@ struct Instruction {
 
 struct Function {
     struct NString name;
-    uint32_t typeIndex;
+    int32_t typeIndex;
     struct Type* type;
     struct NVector localVariablesTypes;  // DataType
     struct NVector instructions;         // Instruction
@@ -228,6 +229,7 @@ static struct Function* createFunction() {
     NString.initialize(&function->name, "");
     NVector.initialize(&function->localVariablesTypes, 0, sizeof(DataType));
     NVector.initialize(&function->instructions, 0, sizeof(struct Instruction));
+    function->typeIndex = -1; // Not set. Can't use 0 because it's a valid type index.
 
     return function;
 }
@@ -254,10 +256,69 @@ static void onFunc_Start(struct NCC* ncc, struct NString* ruleName, int32_t vari
     NVector.pushBack(&module->functions, &newFunction);
 }
 
+static boolean typesEqual(struct Type* type1, struct Type* type2) {
+
+    if (type1->resultType != type2->resultType) return False;
+    if (NVector.size(&type1->parameterTypes) != NVector.size(&type2->parameterTypes)) return False;
+
+    for (int32_t i=NVector.size(&type1->parameterTypes)-1; i>=0; i--) {
+        DataType dataType1 = *(DataType*) NVector.get(&type1->parameterTypes, i);
+        DataType dataType2 = *(DataType*) NVector.get(&type2->parameterTypes, i);
+        if (dataType1 != dataType2) return False;
+    }
+    return True;
+}
+
 static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    //printMatch(ncc, ruleName, variablesCount);
-    // TODO: validate type and type index if both provided. Find type index if not provided. Add
-    // a new one if none found...
+
+    GET_CURRENT_FUNCTION;
+
+    // Validate type and type index if both provided. Find type index if not provided. Add a new one if needed,
+
+    if (function->typeIndex==-1 && !function->type) {
+        // A function with no parameters, result or type index. Treat it as one with an empty type specified,
+        function->type = createType();
+    }
+    
+    int32_t typesCount = NVector.size(&module->types);
+    if (function->typeIndex!=-1 && function->type) {    
+        // Function type inlined and type index also specified (why though?),
+        if (!typesEqual(function->type, *(struct Type**) NVector.get(&module->types, function->typeIndex))) {
+            NERROR("ReferenceMachine.onFunc_End()", "Function inlined type and indexed type don't match.");
+        }
+    } else if (function->type) {    
+        // Function type inlined, but no type index specified,
+        // Find if a matching type exists,        
+        for (int32_t i=typesCount-1; i>=0; i--) {
+            if (typesEqual(function->type, *(struct Type**) NVector.get(&module->types, i))) {
+                function->typeIndex = i;
+                break;
+            }
+        }
+        
+        if (function->typeIndex==-1) {
+            // No matching type found, add a new one,        
+            struct Type* newType = createType();
+            NVector.pushBack(&module->types, &newType);
+            newType->resultType = function->type->resultType;
+            for (int32_t i=NVector.size(&function->type->parameterTypes)-1; i>=0; i--) {
+                DataType dataType = *(DataType*) NVector.get(&function->type->parameterTypes, i);
+                NVector.pushBack(&newType->parameterTypes, &dataType);
+            }
+            function->typeIndex = typesCount;
+        }
+
+    } else {
+        // Function type index specified,
+        if (function->typeIndex>=typesCount) {
+            NERROR("ReferenceMachine.onFunc_End()", "Function indexed type doesn't exist.");
+        }
+    }
+
+    // Dispose of the function type. It was there only because the specification allowed it, but after validation
+    // it's quite useless for us,
+    if (function->type) destroyAndFreeType(function->type);
+    function->type = 0;    
 }
 
 ///////////////////////////////////////////////////////////////////////////
