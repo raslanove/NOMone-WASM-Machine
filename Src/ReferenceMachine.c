@@ -138,19 +138,19 @@ static void pushRuleParameterTypes(struct NCC* ncc, int32_t variablesCount, stru
     }
 }
 
-#define GET_TYPE \
+#define GET_CURRENT_TYPE \
     struct ParsingData* parsingData = ncc->extraData; \
     struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
     struct Type* type = *(struct Type**) NVector.getLast(&module->types)
 
 
 static void onType_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    GET_TYPE;
+    GET_CURRENT_TYPE;
     pushRuleParameterTypes(ncc, variablesCount, &type->parameterTypes);
 }
 
 static void onType_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    GET_TYPE;
+    GET_CURRENT_TYPE;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     type->resultType = getDataTypeFromString(NString.get(&variable.value));
 }
@@ -185,38 +185,38 @@ static void onType_Start(struct NCC* ncc, struct NString* ruleName, int32_t vari
 // Func
 ///////////////////////////////////////////////////////////////////////////
 
-#define GET_FUNCTION \
+#define GET_CURRENT_FUNCTION \
     struct ParsingData* parsingData = ncc->extraData; \
     struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
     struct Function* function = *(struct Function**) NVector.getLast(&module->functions)
 
 static void onFunc_Identifier(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    GET_FUNCTION;
+    GET_CURRENT_FUNCTION;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     NString.set(&function->name, "%s", NString.get(&variable.value));
 }
 
 static void onFunc_TypeIndex(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    GET_FUNCTION;
+    GET_CURRENT_FUNCTION;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     function->typeIndex = NCString.parseInteger(NString.get(&variable.value));
 }
 
 static void onFunc_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    GET_FUNCTION;
+    GET_CURRENT_FUNCTION;
     if (!function->type) function->type = createType();
     pushRuleParameterTypes(ncc, variablesCount, &function->type->parameterTypes);
 }
 
 static void onFunc_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    GET_FUNCTION;
+    GET_CURRENT_FUNCTION;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     if (!function->type) function->type = createType();
     function->type->resultType = getDataTypeFromString(NString.get(&variable.value));
 }
 
 static void onFunc_Local(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    GET_FUNCTION;
+    GET_CURRENT_FUNCTION;
     pushRuleParameterTypes(ncc, variablesCount, &function->localVariablesTypes);
 }
 
@@ -256,14 +256,35 @@ static void onFunc_Start(struct NCC* ncc, struct NString* ruleName, int32_t vari
 
 static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     //printMatch(ncc, ruleName, variablesCount);
+    // TODO: validate type and type index if both provided. Find type index if not provided. Add
+    // a new one if none found...
 }
 
 ///////////////////////////////////////////////////////////////////////////
 // Instruction
 ///////////////////////////////////////////////////////////////////////////
 
-static void onInstruction(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    printMatch(ncc, ruleName, variablesCount);
+static void createAndPushInstruction(struct NCC* ncc, InstructionType instructionType, union Value argument) {
+    GET_CURRENT_FUNCTION;
+    struct Instruction* instruction = NVector.emplaceBack(&function->instructions);
+    instruction->type = instructionType;
+    instruction->argument = argument;
+}
+
+static void createAndPushInstructionWithInt32Argument(struct NCC* ncc, InstructionType instructionType) {
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    union Value value;
+    value.int32 = NCString.parseInteger(NString.get(&variable.value));
+    createAndPushInstruction(ncc, instructionType, value);
+}
+
+static void onInstruction_i32_const(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    createAndPushInstructionWithInt32Argument(ncc, INST_i32_const);
+}
+
+static void onInstruction_local_get(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    createAndPushInstructionWithInt32Argument(ncc, INST_local_get);
+    //printMatch(ncc, ruleName, variablesCount);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -380,10 +401,9 @@ static struct NCC* prepareCC() {
     //     end
     //
     // See: https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
-
-    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , 0, False, False, False);
+    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , onInstruction_i32_const, False, False, False);
     NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u"                     , 0, False, False, False);
-    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", 0, False, False, False);
+    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", onInstruction_local_get, False, False, False);
     NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}", 0, False, False, False);
     NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}", 0, False, False, False); // The same as set, but doesn't consume the value from the stack.
     NCC_addRule(cc, "I-i32.add"      , "i32.add"                         , 0, False, False, False);
