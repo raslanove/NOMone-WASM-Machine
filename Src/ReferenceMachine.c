@@ -363,6 +363,49 @@ static void onInstruction_call_indirect(struct NCC* ncc, struct NString* ruleNam
 static void onInstruction_return       (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_return       ); }
 
 ///////////////////////////////////////////////////////////////////////////
+// Table
+///////////////////////////////////////////////////////////////////////////
+
+static struct Table* createTable() {
+    struct Table* table = NMALLOC(sizeof(struct Table), "ReferenceMachine.createTable() table");
+    NSystemUtils.memset(function, 0, sizeof(struct Table));
+    NVector.initialize(&table->functions, 0, sizeof(struct Function*));
+    return table;
+}
+
+static void onTable_end(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    struct ParsingData* parsingData = ncc->extraData;
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+    
+    struct Table* newTable = createTable();
+    ..xxx
+
+    pushRuleParameterTypes(ncc, variablesCount, &function->localVariablesTypes);
+}
+
+static void destroyAndFreeFunction(struct Function* function) {
+    NString.destroy(&function->name);
+    NVector.destroy(&function->localVariablesTypes);
+    NVector.destroy(&function->instructions);
+    if (function->type) destroyAndFreeType(function->type);
+    NFREE(function, "ReferenceMachine.destroyAndFreeFunction() function");
+}
+
+static void onFunc_Start(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+
+    #ifdef NWM_VERBOSE
+    NLOGI("ReferenceMachine", "Func->Start");
+    #endif
+    struct ParsingData* parsingData = ncc->extraData;
+
+    // Create a new function in the current module,
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+
+    struct Function* newFunction = createFunction();
+    NVector.pushBack(&module->functions, &newFunction);
+}
+
+///////////////////////////////////////////////////////////////////////////
 // Module
 ///////////////////////////////////////////////////////////////////////////
 
@@ -607,7 +650,7 @@ static struct NCC* prepareCC() {
     // See: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#webassembly_tables
     NCC_addRule(cc, "Table->minSize", "${PositiveInteger}", 0, False, False, False);
     NCC_addRule(cc, "Table->maxSize", "${PositiveInteger}", 0, False, False, False);
-    NCC_addRule(cc, "Table", "(${} table ${} ${Table->minSize}|${Empty} ${} ${Table->maxSize} ${} funcref ${})", 0, False, True, False);
+    NCC_addRule(cc, "Table", "(${} table ${} {${Table->minSize}|${Empty} ${} ${Table->maxSize}}|${Empty} ${} funcref ${})", onTable_end, False, True, False);
 
     // Memory,
     NCC_addRule(cc, "Memory->pagesCount", "${PositiveInteger}", 0, False, False, False);
