@@ -373,7 +373,12 @@ static struct Table* createTable() {
     return table;
 }
 
-static void onTable_end(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+static void destroyAndFreeTable(struct Table* table) {
+    NVector.destroy(&table->functions);
+    NFREE(table, "ReferenceMachine.destroyAndFreeTable() table");
+}
+
+static void onTable_End(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
 
     #ifdef NWM_VERBOSE
     NLOGI("ReferenceMachine", "Table->End");
@@ -383,16 +388,53 @@ static void onTable_end(struct NCC* ncc, struct NString* ruleName, int32_t varia
     struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
 
     if (module->functionsTable) {
-        NERROR("ReferenceMachine.onTable_end()", "Table defined more than once.");
+        NERROR("ReferenceMachine.onTable_End()", "Table defined more than once.");
         return;
     }
 
     module->functionsTable = createTable();
 }
 
-static void destroyAndFreeTable(struct Table* table) {
-    NVector.destroy(&table->functions);
-    NFREE(table, "ReferenceMachine.destroyAndFreeTable() table");
+///////////////////////////////////////////////////////////////////////////
+// Memory
+///////////////////////////////////////////////////////////////////////////
+
+#define GET_CURRENT_MEMORY \
+    struct ParsingData* parsingData = ncc->extraData; \
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
+    struct Memory* memory = module->memory
+
+static void onMemory_PagesCount(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_MEMORY;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    NByteVector.resize(&memory->data, 64*1024*NCString.parseInteger(NString.get(&variable.value)));
+}
+
+static struct Memory* createMemory() {
+    struct Memory* memory = NMALLOC(sizeof(struct Memory), "ReferenceMachine.createMemory() memory");
+    NSystemUtils.memset(memory, 0, sizeof(struct Memory));
+    NByteVector.initialize(&memory->data, 0);
+    return memory;
+}
+
+static void destroyAndFreeMemory(struct Memory* memory) {
+    NByteVector.destroy(&memory->data);
+    NFREE(memory, "ReferenceMachine.destroyAndFreeMemory() memory");
+}
+
+static void onMemory_Start(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+
+    #ifdef NWM_VERBOSE
+    NLOGI("ReferenceMachine", "Memory->Start");
+    #endif
+
+    GET_CURRENT_MEMORY;
+    if (memory) {
+        NERROR("ReferenceMachine.onMemory_Start()", "Memory defined more than once.");
+        return;
+    }
+
+    module->memory = createMemory();
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -414,8 +456,8 @@ static struct Module* createModule() {
 
 static void destroyAndFreeModule(struct Module* module) {
 
-    // TODO: destroy memory...
-    if (!module->memoryImported) {}
+    // Memory,
+    if (!module->memoryImported) destroyAndFreeMemory(module->memory);
 
     // Table,
     if (!module->tableImported) destroyAndFreeTable(module->functionsTable);
@@ -483,7 +525,7 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "LineComment", ";;*${LineEnd}", 0, False, False, False);
     NCC_addRule(cc, "BlockComment", "(;*;)", 0, False, False, False);
     NCC_addRule(cc, "", "{${WhiteSpace}|${LineComment}|${BlockComment}}^*", 0, False, False, False);
-    NCC_addRule(cc, "PositiveInteger", "0 | 1-9 0-9^*", 0, False, True, False);
+    NCC_addRule(cc, "PositiveInteger", "0 | {1-9 0-9^*}", 0, False, True, False);
     NCC_addRule(cc, "Integer", "0 | {\\-|${Empty} 1-9 0-9^*}", 0, False, True, False);
     // TODO: float......xxxx
     NCC_addRule(cc, "String", "\" { ${Literal}|{\\\\${Literal}} }^* \"", 0, False, False, False);
@@ -641,11 +683,12 @@ static struct NCC* prepareCC() {
     // See: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#webassembly_tables
     NCC_addRule(cc, "Table->minSize", "${PositiveInteger}", 0, False, False, False);
     NCC_addRule(cc, "Table->maxSize", "${PositiveInteger}", 0, False, False, False);
-    NCC_addRule(cc, "Table", "(${} table ${} {${Table->minSize}|${Empty} ${} ${Table->maxSize}}|${Empty} ${} funcref ${})", onTable_end, False, True, False);
+    NCC_addRule(cc, "Table", "(${} table ${} {${Table->minSize}|${Empty} ${} ${Table->maxSize}}|${Empty} ${} funcref ${})", onTable_End, False, True, False);
 
     // Memory,
-    NCC_addRule(cc, "Memory->pagesCount", "${PositiveInteger}", 0, False, False, False);
-    NCC_addRule(cc, "Memory", "(${} memory ${} ${Memory->pagesCount} ${})", 0, False, True, False);
+    NCC_addRule(cc, "Memory->Start", "", onMemory_Start, False, False, False);
+    NCC_addRule(cc, "Memory->PagesCount", "${PositiveInteger}", onMemory_PagesCount, False, False, True);
+    NCC_addRule(cc, "Memory", "${Memory->Start} (${} memory ${} ${Memory->PagesCount} ${})", 0, False, True, False);
 
     // Global,
     //     Examples:
