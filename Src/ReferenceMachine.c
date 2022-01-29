@@ -368,41 +368,31 @@ static void onInstruction_return       (struct NCC* ncc, struct NString* ruleNam
 
 static struct Table* createTable() {
     struct Table* table = NMALLOC(sizeof(struct Table), "ReferenceMachine.createTable() table");
-    NSystemUtils.memset(function, 0, sizeof(struct Table));
+    NSystemUtils.memset(table, 0, sizeof(struct Table));
     NVector.initialize(&table->functions, 0, sizeof(struct Function*));
     return table;
 }
 
 static void onTable_end(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    struct ParsingData* parsingData = ncc->extraData;
-    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
-    
-    struct Table* newTable = createTable();
-    ..xxx
-
-    pushRuleParameterTypes(ncc, variablesCount, &function->localVariablesTypes);
-}
-
-static void destroyAndFreeFunction(struct Function* function) {
-    NString.destroy(&function->name);
-    NVector.destroy(&function->localVariablesTypes);
-    NVector.destroy(&function->instructions);
-    if (function->type) destroyAndFreeType(function->type);
-    NFREE(function, "ReferenceMachine.destroyAndFreeFunction() function");
-}
-
-static void onFunc_Start(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
 
     #ifdef NWM_VERBOSE
-    NLOGI("ReferenceMachine", "Func->Start");
+    NLOGI("ReferenceMachine", "Table->End");
     #endif
-    struct ParsingData* parsingData = ncc->extraData;
 
-    // Create a new function in the current module,
+    struct ParsingData* parsingData = ncc->extraData;
     struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
 
-    struct Function* newFunction = createFunction();
-    NVector.pushBack(&module->functions, &newFunction);
+    if (module->functionsTable) {
+        NERROR("ReferenceMachine.onTable_end()", "Table defined more than once.");
+        return;
+    }
+
+    module->functionsTable = createTable();
+}
+
+static void destroyAndFreeTable(struct Table* table) {
+    NVector.destroy(&table->functions);
+    NFREE(table, "ReferenceMachine.destroyAndFreeTable() table");
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -426,8 +416,9 @@ static void destroyAndFreeModule(struct Module* module) {
 
     // TODO: destroy memory...
     if (!module->memoryImported) {}
-    // TODO: destroy table...
-    if (!module->tableImported) {}
+
+    // Table,
+    if (!module->tableImported) destroyAndFreeTable(module->functionsTable);
 
     // Types,
     struct Type* type; while (NVector.popBack(&module->types, &type)) destroyAndFreeType(type);

@@ -8,7 +8,7 @@ INCLUDES = \
 CFLAGS = $(INCLUDES) -DDESKTOP -DNVERBOSE=1 -DNPROFILE_MEMORY=1 -g -MMD# g=>generate debug info. MMD=>generate dependency files.
 
 # Clang is more picky. Using it can help us pin-point more issues.
-CC = gcc
+CC = clang
 
 # Optimization flags,
 #CFLAGS += -s -O3 -fdata-sections -ffunction-sections 
