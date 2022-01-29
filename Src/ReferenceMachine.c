@@ -322,7 +322,7 @@ static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variab
 }
 
 ///////////////////////////////////////////////////////////////////////////
-// Instruction
+// Instructions
 ///////////////////////////////////////////////////////////////////////////
 
 static void createAndPushInstruction(struct NCC* ncc, InstructionType instructionType, union Value argument) {
@@ -332,6 +332,12 @@ static void createAndPushInstruction(struct NCC* ncc, InstructionType instructio
     instruction->argument = argument;
 }
 
+static void createAndPushInstructionNoArgument(struct NCC* ncc, InstructionType instructionType) {
+    union Value value;
+    value.int32 = 0;
+    createAndPushInstruction(ncc, instructionType, value);
+}
+
 static void createAndPushInstructionWithInt32Argument(struct NCC* ncc, InstructionType instructionType) {
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     union Value value;
@@ -339,14 +345,22 @@ static void createAndPushInstructionWithInt32Argument(struct NCC* ncc, Instructi
     createAndPushInstruction(ncc, instructionType, value);
 }
 
-static void onInstruction_i32_const(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    createAndPushInstructionWithInt32Argument(ncc, INST_i32_const);
-}
-
-static void onInstruction_local_get(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
-    createAndPushInstructionWithInt32Argument(ncc, INST_local_get);
-    //printMatch(ncc, ruleName, variablesCount);
-}
+static void onInstruction_i32_const    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_i32_const    ); }
+static void onInstruction_i32_load8_u  (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_load8_u  ); }
+static void onInstruction_local_get    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_get    ); }
+static void onInstruction_local_set    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_set    ); }
+static void onInstruction_local_tee    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_tee    ); }
+static void onInstruction_i32_add      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_add      ); }
+static void onInstruction_i32_and      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_and      ); }
+static void onInstruction_loop         (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_loop         ); }
+static void onInstruction_block        (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_block        ); }
+static void onInstruction_end          (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_end          ); }
+static void onInstruction_i32_eq       (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_eq       ); }
+static void onInstruction_i32_eqz      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_eqz      ); }
+static void onInstruction_br           (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_br           ); }
+static void onInstruction_br_if        (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_br_if        ); }
+static void onInstruction_call_indirect(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_call_indirect); }
+static void onInstruction_return       (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_return       ); }
 
 ///////////////////////////////////////////////////////////////////////////
 // Module
@@ -462,24 +476,24 @@ static struct NCC* prepareCC() {
     //     end
     //
     // See: https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
-    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , onInstruction_i32_const, False, False, False);
-    NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u"                     , 0, False, False, False);
-    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", onInstruction_local_get, False, False, False);
-    NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}", 0, False, False, False);
-    NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}", 0, False, False, False); // The same as set, but doesn't consume the value from the stack.
-    NCC_addRule(cc, "I-i32.add"      , "i32.add"                         , 0, False, False, False);
-    NCC_addRule(cc, "I-i32.and"      , "i32.and"                         , 0, False, False, False);
-    NCC_addRule(cc, "I-loop"         , "loop"                            , 0, False, False, False);
-    NCC_addRule(cc, "I-block"        , "block"                           , 0, False, False, False);
-    NCC_addRule(cc, "I-end"          , "end"                             , 0, False, False, False);
-    NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                          , 0, False, False, False);
-    NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                         , 0, False, False, False);
-    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"       , 0, False, False, False);
-    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"    , 0, False, False, False);
-    NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${TypeIndex}"  , 0, False, False, False); // The function type is needed for type checking only.
-                                                                                                    // The indirect call pops the desired function index
-                                                                                                    // from the stack, or from a nested instruction.
-    NCC_addRule(cc, "I-return"       , "return"                          , 0, False, False, False);
+    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , onInstruction_i32_const    , False, False, False);
+    NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u"                     , onInstruction_i32_load8_u  , False, False, False);
+    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", onInstruction_local_get    , False, False, False);
+    NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}", onInstruction_local_set    , False, False, False);
+    NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}", onInstruction_local_tee    , False, False, False); // The same as set, but doesn't consume the value from the stack.
+    NCC_addRule(cc, "I-i32.add"      , "i32.add"                         , onInstruction_i32_add      , False, False, False);
+    NCC_addRule(cc, "I-i32.and"      , "i32.and"                         , onInstruction_i32_and      , False, False, False);
+    NCC_addRule(cc, "I-loop"         , "loop"                            , onInstruction_loop         , False, False, False);
+    NCC_addRule(cc, "I-block"        , "block"                           , onInstruction_block        , False, False, False);
+    NCC_addRule(cc, "I-end"          , "end"                             , onInstruction_end          , False, False, False);
+    NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                          , onInstruction_i32_eq       , False, False, False);
+    NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                         , onInstruction_i32_eqz      , False, False, False);
+    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"       , onInstruction_br           , False, False, False);
+    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"    , onInstruction_br_if        , False, False, False);
+    NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${TypeIndex}"  , onInstruction_call_indirect, False, False, False); // The function type is needed for type checking only.
+                                                                                                                              // The indirect call pops the desired function index
+                                                                                                                              // from the stack, or from a nested instruction.
+    NCC_addRule(cc, "I-return"       , "return"                          , onInstruction_return       , False, False, False);
 
 
     NCC_addRule(cc, "Instruction", "${I-i32.const}     |"
