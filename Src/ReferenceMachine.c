@@ -75,6 +75,7 @@ struct Global {
 };
 
 struct Export {
+    struct NString name;
     ExportType type;
     uint32_t index;
 };
@@ -477,6 +478,67 @@ static void onGlobal_Start(struct NCC* ncc, struct NString* ruleName, int32_t va
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// Export
+///////////////////////////////////////////////////////////////////////////
+
+#define GET_CURRENT_EXPORT \
+    struct ParsingData* parsingData = ncc->extraData; \
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
+    struct Export* export = NVector.getLast(&module->exports)
+
+static void onExport_Name(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_EXPORT;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    NString.set(&export->name, "%s", NString.get(&variable.value));
+}
+
+static void onExport_Memory(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_EXPORT;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    export->index = NCString.parseInteger(NString.get(&variable.value));
+}
+
+static void onExport_Global(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_EXPORT;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    export->index = NCString.parseInteger(NString.get(&variable.value));
+}
+
+static void onExport_Func(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_EXPORT;
+
+    // Find the function with this identifier,
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    for (int32_t i=NVector.size(&module->functions)-1; i>-1; i--) {
+        struct Function* function = *(struct Function **) NVector.get(&module->functions, i);
+        if (NCString.equals(NString.get(&function->name), NString.get(&variable.value))) {
+            export->index = i;
+            return ;
+        }
+    }
+
+    NERROR("ReferenceMachine.onExport_Func()", "Function %s%s%s index not found.", NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
+}
+
+static void destroyExport(struct Export* export) {
+    NString.destroy(&export->name);
+}
+
+static void onExport_Start(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+
+    #ifdef NWM_VERBOSE
+    NLOGI("ReferenceMachine", "Export->Start");
+    #endif
+
+    struct ParsingData* parsingData = ncc->extraData;
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+    struct Export* export = NVector.emplaceBack(&module->exports);
+
+    NSystemUtils.memset(export, 0, sizeof(struct Export));
+    NString.initialize(&export->name, "");
+}
+
+///////////////////////////////////////////////////////////////////////////
 // Module
 ///////////////////////////////////////////////////////////////////////////
 
@@ -509,8 +571,12 @@ static void destroyAndFreeModule(struct Module* module) {
     struct Function* function; while (NVector.popBack(&module->functions, &function)) destroyAndFreeFunction(function);
     NVector.destroy(&module->functions);
 
-    NVector.destroy(&module->globals  );
-    NVector.destroy(&module->exports  );
+    // Exports,
+    for (int32_t i=NVector.size(&module->exports)-1; i>-1; i--) destroyExport(NVector.get(&module->exports, i));
+    NVector.destroy(&module->exports);
+
+    // Globals,
+    NVector.destroy(&module->globals);
 
     NFREE(module, "ReferenceMachine.destroyAndFreeModule() module");
 }
@@ -567,7 +633,7 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "PositiveInteger", "0 | {1-9 0-9^*}", 0, False, True, False);
     NCC_addRule(cc, "Integer", "0 | {\\-|${Empty} 1-9 0-9^*}", 0, False, True, False);
     // TODO: float......xxxx
-    NCC_addRule(cc, "String", "\" { ${Literal}|{\\\\${Literal}} }^* \"", 0, False, False, False);
+    NCC_addRule(cc, "String", "\" { ${Literal}|{\\\\${Literal}} }^* \"", 0, False, True, False);
     // Note: maybe it's better to specify the supported ranges instead of excluding the unsupported ones?
     NCC_addRule(cc, "IdentifierLiteral", "\x01-\x08 | \x0b-\x0c | \x0e-\x1f | \x21-\x27 | \x2b-\xff", 0, False, False, False); // Note, characters like '*', ' ' and '-' must be escaped before being used in a literal-range expression.
     NCC_addRule(cc, "Identifier", "\\$${IdentifierLiteral}^*", 0, False, True, False);
@@ -744,10 +810,12 @@ static struct NCC* prepareCC() {
     //         (export "memory" (memory 0))
     //         (export "NSystem" (global 1))
     //         (export "__wasm_call_ctors" (func $__wasm_call_ctors))
-    NCC_addRule(cc, "MemoryIndex", "(${} memory ${} ${PositiveInteger} ${})", 0, False, False, False);
-    NCC_addRule(cc, "GlobalIndex", "(${} global ${} ${PositiveInteger} ${})", 0, False, False, False);
-    NCC_addRule(cc, "FuncName", "(${} func ${} ${Identifier} ${})", 0, False, False, False);
-    NCC_addRule(cc, "Export", "(${} export ${} ${String} ${} ${MemoryIndex}|${GlobalIndex}|${FuncName} ${})", 0, False, True, False);
+    NCC_addRule(cc, "Export->Start", "", onExport_Start, False, False, False);
+    NCC_addRule(cc, "Export->Name", "${String}", onExport_Name, False, False, True);
+    NCC_addRule(cc, "Export->Memory", "(${} memory ${} ${PositiveInteger} ${})", onExport_Memory, False, False, True);
+    NCC_addRule(cc, "Export->Global", "(${} global ${} ${PositiveInteger} ${})", onExport_Global, False, False, True);
+    NCC_addRule(cc, "Export->Func", "(${} func ${} ${Identifier} ${})", onExport_Func, False, False, True);
+    NCC_addRule(cc, "Export", "${Export->Start} (${} export ${} ${Export->Name} ${} ${Export->Memory}|${Export->Global}|${Export->Func} ${})", 0, False, True, False);
 
     // Element,
     //     Example:
