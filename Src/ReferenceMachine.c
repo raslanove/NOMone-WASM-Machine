@@ -71,6 +71,7 @@ struct Memory {
 struct Global {
     DataType type;
     union Value value;
+    boolean mutable;
 };
 
 struct Export {
@@ -143,7 +144,6 @@ static void pushRuleParameterTypes(struct NCC* ncc, int32_t variablesCount, stru
     struct ParsingData* parsingData = ncc->extraData; \
     struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
     struct Type* type = *(struct Type**) NVector.getLast(&module->types)
-
 
 static void onType_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     GET_CURRENT_TYPE;
@@ -438,6 +438,45 @@ static void onMemory_Start(struct NCC* ncc, struct NString* ruleName, int32_t va
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// Global
+///////////////////////////////////////////////////////////////////////////
+
+#define GET_CURRENT_GLOBAL \
+    struct ParsingData* parsingData = ncc->extraData; \
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules); \
+    struct Global* global = NVector.getLast(&module->globals)
+
+static void onGlobal_DataType(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_GLOBAL;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    global->type = getDataTypeFromString(NString.get(&variable.value));
+}
+
+static void onGlobal_Mutable(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_GLOBAL;
+    global->mutable = True;
+}
+
+static void onGlobal_Value(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+    GET_CURRENT_GLOBAL;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 1, &variable);
+    global->value.int64 = NCString.parse64BitInteger(NString.get(&variable.value));
+}
+
+static void onGlobal_Start(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+
+    #ifdef NWM_VERBOSE
+    NLOGI("ReferenceMachine", "Global->Start");
+    #endif
+
+    struct ParsingData* parsingData = ncc->extraData;
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+    struct Global* global = NVector.emplaceBack(&module->globals);
+
+    NSystemUtils.memset(global, 0, sizeof(struct Global));
+}
+
+///////////////////////////////////////////////////////////////////////////
 // Module
 ///////////////////////////////////////////////////////////////////////////
 
@@ -448,8 +487,8 @@ static struct Module* createModule() {
 
     NVector.initialize(&module->types    , 0, sizeof(struct Type*    ));
     NVector.initialize(&module->functions, 0, sizeof(struct Function*));
-    NVector.initialize(&module->globals  , 0, sizeof(struct Global*  ));
-    NVector.initialize(&module->exports  , 0, sizeof(struct Export*  ));
+    NVector.initialize(&module->globals  , 0, sizeof(struct Global   ));
+    NVector.initialize(&module->exports  , 0, sizeof(struct Export   ));
 
     return module;
 }
@@ -694,9 +733,11 @@ static struct NCC* prepareCC() {
     //     Examples:
     //         (global (;0;) (mut i32) (i32.const 68272))
     //         (global (;1;) i32 (i32.const 1024))
-    NCC_addRule(cc, "Global->mutable", "(${} mut ${} ${DataType} ${})", 0, False, False, False);
-    NCC_addRule(cc, "Global->value", "(${} ${DataType}.const ${} ${Integer} ${})", 0, False, False, False); // TODO: support float. Add two cases, integerType+integerValue and floatType+floatValue...
-    NCC_addRule(cc, "Global", "(${} global ${} ${DataType}|${Global->mutable} ${} ${Global->value} ${})", 0, False, True, False);
+    NCC_addRule(cc, "Global->Start", "", onGlobal_Start, False, False, False);
+    NCC_addRule(cc, "Global->DataType", "${DataType}", onGlobal_DataType, False, False, True);
+    NCC_addRule(cc, "Global->Mutable", "(${} mut ${} ${Global->DataType} ${})", onGlobal_Mutable, False, False, False);
+    NCC_addRule(cc, "Global->Value", "(${} ${DataType}.const ${} ${Integer} ${})", onGlobal_Value, False, False, True); // TODO: support float. Add two cases, integerType+integerValue and floatType+floatValue...
+    NCC_addRule(cc, "Global", "${Global->Start} (${} global ${} ${Global->DataType}|${Global->Mutable} ${} ${Global->Value} ${})", 0, False, True, False);
 
     // Export,
     //     Examples:
