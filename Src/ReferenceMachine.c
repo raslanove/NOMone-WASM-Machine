@@ -494,24 +494,28 @@ static void onExport_Name(struct NCC* ncc, struct NString* ruleName, int32_t var
 
 static void onExport_Memory(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     GET_CURRENT_EXPORT;
+    export->type = TYPE_MEMORY;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     export->index = NCString.parseInteger(NString.get(&variable.value));
 }
 
 static void onExport_Global(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     GET_CURRENT_EXPORT;
+    export->type = TYPE_GLOBAL;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     export->index = NCString.parseInteger(NString.get(&variable.value));
 }
 
 static void onExport_Func(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     GET_CURRENT_EXPORT;
+    export->type = TYPE_FUNC;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    const char* identifier = NString.get(&variable.value);
 
     // Find the function with this identifier,
-    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     for (int32_t i=NVector.size(&module->functions)-1; i>-1; i--) {
         struct Function* function = *(struct Function **) NVector.get(&module->functions, i);
-        if (NCString.equals(NString.get(&function->name), NString.get(&variable.value))) {
+        if (NCString.equals(NString.get(&function->name), identifier)) {
             export->index = i;
             return ;
         }
@@ -536,6 +540,59 @@ static void onExport_Start(struct NCC* ncc, struct NString* ruleName, int32_t va
 
     NSystemUtils.memset(export, 0, sizeof(struct Export));
     NString.initialize(&export->name, "");
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Element
+///////////////////////////////////////////////////////////////////////////
+
+static void onElement_End(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+
+    #ifdef NWM_VERBOSE
+    NLOGI("ReferenceMachine", "Element->End");
+    #endif
+
+    struct ParsingData* parsingData = ncc->extraData;
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+
+    // Make sure there's a function table,
+    if (!module->functionsTable) module->functionsTable = createTable();
+
+
+    // Check if there's an offset,
+    int32_t tableSize = NVector.size(module->functionsTable);
+    int32_t offset = tableSize;
+    int32_t currentVariableIndex = 0;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    if (NCString.equals(variable.name, "PositiveInteger")) {
+        offset = NCString.parseInteger(NString.get(&variable.value));
+        currentVariableIndex = 1;
+    }
+
+    // Prepare the table,
+    int32_t minNewSize = offset + variablesCount - currentVariableIndex;
+    if (tableSize < minNewSize) NVector.resize(module->functionsTable, minNewSize);
+
+    // Populate the table,
+    for (; currentVariableIndex<variablesCount; currentVariableIndex++) {
+        NCC_getRuleVariable(ncc, currentVariableIndex, &variable);
+        const char* identifier = NString.get(&variable.value);
+
+        // Find the function with this identifier,
+        boolean found = False;
+        for (int32_t i=NVector.size(&module->functions)-1; i>-1; i--) {
+            struct Function* function = *(struct Function **) NVector.get(&module->functions, i);
+            if (NCString.equals(NString.get(&function->name), identifier)) {
+                struct Function** tableEntry = NVector.get(module->functionsTable, offset);
+                *tableEntry = function;
+                found = True;
+                break;
+            }
+        }
+
+        if (!found) NERROR("ReferenceMachine.onElement_End()", "Function %s%s%s not found.", NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
+        offset++;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -788,12 +845,12 @@ static struct NCC* prepareCC() {
     // See: https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format#webassembly_tables
     NCC_addRule(cc, "Table->minSize", "${PositiveInteger}", 0, False, False, False);
     NCC_addRule(cc, "Table->maxSize", "${PositiveInteger}", 0, False, False, False);
-    NCC_addRule(cc, "Table", "(${} table ${} {${Table->minSize}|${Empty} ${} ${Table->maxSize}}|${Empty} ${} funcref ${})", onTable_End, False, True, False);
+    NCC_addRule(cc, "Table", "(${} table ${} {${Table->minSize}|${Empty} ${} ${Table->maxSize}}|${Empty} ${} funcref ${})", onTable_End, False, False, True);
 
     // Memory,
     NCC_addRule(cc, "Memory->Start", "", onMemory_Start, False, False, False);
     NCC_addRule(cc, "Memory->PagesCount", "${PositiveInteger}", onMemory_PagesCount, False, False, True);
-    NCC_addRule(cc, "Memory", "${Memory->Start} (${} memory ${} ${Memory->PagesCount} ${})", 0, False, True, False);
+    NCC_addRule(cc, "Memory", "${Memory->Start} (${} memory ${} ${Memory->PagesCount} ${})", 0, False, False, False);
 
     // Global,
     //     Examples:
@@ -803,7 +860,7 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "Global->DataType", "${DataType}", onGlobal_DataType, False, False, True);
     NCC_addRule(cc, "Global->Mutable", "(${} mut ${} ${Global->DataType} ${})", onGlobal_Mutable, False, False, False);
     NCC_addRule(cc, "Global->Value", "(${} ${DataType}.const ${} ${Integer} ${})", onGlobal_Value, False, False, True); // TODO: support float. Add two cases, integerType+integerValue and floatType+floatValue...
-    NCC_addRule(cc, "Global", "${Global->Start} (${} global ${} ${Global->DataType}|${Global->Mutable} ${} ${Global->Value} ${})", 0, False, True, False);
+    NCC_addRule(cc, "Global", "${Global->Start} (${} global ${} ${Global->DataType}|${Global->Mutable} ${} ${Global->Value} ${})", 0, False, False, False);
 
     // Export,
     //     Examples:
@@ -815,19 +872,19 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "Export->Memory", "(${} memory ${} ${PositiveInteger} ${})", onExport_Memory, False, False, True);
     NCC_addRule(cc, "Export->Global", "(${} global ${} ${PositiveInteger} ${})", onExport_Global, False, False, True);
     NCC_addRule(cc, "Export->Func", "(${} func ${} ${Identifier} ${})", onExport_Func, False, False, True);
-    NCC_addRule(cc, "Export", "${Export->Start} (${} export ${} ${Export->Name} ${} ${Export->Memory}|${Export->Global}|${Export->Func} ${})", 0, False, True, False);
+    NCC_addRule(cc, "Export", "${Export->Start} (${} export ${} ${Export->Name} ${} ${Export->Memory}|${Export->Global}|${Export->Func} ${})", 0, False, False, False);
 
     // Element,
     //     Example:
     //         (elem (;0;) (i32.const 1) func $initialize $terminate $strlen)
-    NCC_addRule(cc, "TableOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, False);
-    NCC_addRule(cc, "Element", "(${} elem ${} ${TableOffset}|${Empty} ${} func ${} ${Identifier} ${} {${Identifier} ${}}^*)", 0, False, True, False);
+    NCC_addRule(cc, "Element->TableOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Element", "(${} elem ${} ${Element->TableOffset}|${Empty} ${} func ${} ${Identifier} ${} {${Identifier} ${}}^*)", onElement_End, False, False, True);
 
     // Data,
     //     Example:
     //         (data (;0;) (i32.const 1024) "NCString.parseInteger()\00Integer length can't exceed 10 digits and a sign. Found: %s%s\00\19\09\00\00!\09\00\00\c9\07\00\00\d9\07\00\00\09\09\00\00\f9\08\00\00(module)\00Parsing result\00%s\0a\00True\00False\00"))
     NCC_addRule(cc, "MemoryOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, False);
-    NCC_addRule(cc, "Data", "(${} data ${} ${MemoryOffset} ${} ${String} ${})", 0, False, True, False);
+    NCC_addRule(cc, "Data", "(${} data ${} ${MemoryOffset} ${} ${String} ${})", 0, False, False, False);
 
     // Module,
     NCC_addRule(cc, "Module->Start", "", onModule_Start, False, False, False);
