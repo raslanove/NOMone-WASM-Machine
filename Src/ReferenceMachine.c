@@ -558,9 +558,8 @@ static void onElement_End(struct NCC* ncc, struct NString* ruleName, int32_t var
     // Make sure there's a function table,
     if (!module->functionsTable) module->functionsTable = createTable();
 
-
     // Check if there's an offset,
-    int32_t tableSize = NVector.size(module->functionsTable);
+    int32_t tableSize = NVector.size(&module->functionsTable->functions);
     int32_t offset = tableSize;
     int32_t currentVariableIndex = 0;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
@@ -571,7 +570,7 @@ static void onElement_End(struct NCC* ncc, struct NString* ruleName, int32_t var
 
     // Prepare the table,
     int32_t minNewSize = offset + variablesCount - currentVariableIndex;
-    if (tableSize < minNewSize) NVector.resize(module->functionsTable, minNewSize);
+    if (tableSize < minNewSize) NVector.resize(&module->functionsTable->functions, minNewSize);
 
     // Populate the table,
     for (; currentVariableIndex<variablesCount; currentVariableIndex++) {
@@ -583,7 +582,7 @@ static void onElement_End(struct NCC* ncc, struct NString* ruleName, int32_t var
         for (int32_t i=NVector.size(&module->functions)-1; i>-1; i--) {
             struct Function* function = *(struct Function **) NVector.get(&module->functions, i);
             if (NCString.equals(NString.get(&function->name), identifier)) {
-                struct Function** tableEntry = NVector.get(module->functionsTable, offset);
+                struct Function** tableEntry = NVector.get(&module->functionsTable->functions, offset);
                 *tableEntry = function;
                 found = True;
                 break;
@@ -592,6 +591,80 @@ static void onElement_End(struct NCC* ncc, struct NString* ruleName, int32_t var
 
         if (!found) NERROR("ReferenceMachine.onElement_End()", "Function %s%s%s not found.", NTCOLOR(HIGHLIGHT), NString.get(&variable.value), NTCOLOR(STREAM_DEFAULT));
         offset++;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Data
+///////////////////////////////////////////////////////////////////////////
+
+static void onData_End(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
+
+    #ifdef NWM_VERBOSE
+    NLOGI("ReferenceMachine", "Data->End");
+    #endif
+
+    struct ParsingData* parsingData = ncc->extraData;
+    struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
+
+    // Make sure there's a memory,
+    if (!module->memory) module->memory = createMemory();
+
+    // Check if there's an offset,
+    uint32_t offset = 0;
+    int32_t currentVariableIndex = 0;
+    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
+    if (NCString.equals(variable.name, "PositiveInteger")) {
+        offset = NCString.parseInteger(NString.get(&variable.value));
+        currentVariableIndex = 1;
+    }
+
+    // Unescape the data,
+    NCC_getRuleVariable(ncc, currentVariableIndex, &variable);
+    const char* data = NString.get(&variable.value);
+
+    struct NByteVector* memoryData = &module->memory->data;
+    uint32_t memorySize = NByteVector.size(memoryData);
+    uint32_t currentByteIndex=0;
+    uint8_t currentByte;
+    while ((currentByte = data[currentByteIndex])) {
+
+        // Check if this is an escape sequence,
+        if (currentByte == '\\') {
+
+            // Note: whenever the '\' character itself is required, a "\5c" is used.
+
+            // The following two digits should be a hexadecimal value,
+            char hexByte1 = data[currentByteIndex + 1];
+            if (hexByte1 >= '0' && hexByte1 <= '9') {
+                currentByte = (hexByte1 - '0') << 4;
+            } else if (hexByte1 >= 'a' && hexByte1 <= 'f') {
+                currentByte = (10 + hexByte1 - 'a') << 4;
+            } else {
+                NERROR("ReferenceMachine.onData_End()", "Malformed escape sequence. Expecting %s\\0-9|a-f%s, found %s\\%c%s.", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), hexByte1, NTCOLOR(STREAM_DEFAULT));
+            }
+
+            char hexByte2 = data[currentByteIndex + 2];
+            if (hexByte2 >= '0' && hexByte2 <= '9') {
+                currentByte += hexByte2 - '0';
+            } else if (hexByte2 >= 'a' && hexByte2 <= 'f') {
+                currentByte += 10 + hexByte2 - 'a';
+            } else {
+                NERROR("ReferenceMachine.onData_End()", "Malformed escape sequence. Expecting %s\\{0-9|a-f}{0-9|a-f}%s, found %s\\%c%c%s.", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), hexByte1, hexByte2, NTCOLOR(STREAM_DEFAULT));
+            }
+
+            currentByteIndex+=2;
+        }
+
+        // Set the byte,
+        if (offset >= memorySize) {
+            NByteVector.pushBack(memoryData, currentByte);
+            memorySize = NByteVector.size(memoryData);
+        } else {
+            NByteVector.set(memoryData, offset, currentByte);
+        }
+        offset++;
+        currentByteIndex++;
     }
 }
 
@@ -883,8 +956,8 @@ static struct NCC* prepareCC() {
     // Data,
     //     Example:
     //         (data (;0;) (i32.const 1024) "NCString.parseInteger()\00Integer length can't exceed 10 digits and a sign. Found: %s%s\00\19\09\00\00!\09\00\00\c9\07\00\00\d9\07\00\00\09\09\00\00\f9\08\00\00(module)\00Parsing result\00%s\0a\00True\00False\00"))
-    NCC_addRule(cc, "MemoryOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, False);
-    NCC_addRule(cc, "Data", "(${} data ${} ${MemoryOffset} ${} ${String} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Data->MemoryOffset", "(${} i32.const ${} ${PositiveInteger} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Data", "(${} data ${} ${Data->MemoryOffset} ${} ${String} ${})", onData_End, False, False, True);
 
     // Module,
     NCC_addRule(cc, "Module->Start", "", onModule_Start, False, False, False);
