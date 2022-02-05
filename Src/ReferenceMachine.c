@@ -42,8 +42,15 @@ union Value {
     double float64;
 };
 
+struct LocalVariable {
+    DataType type;
+    int32_t offset;
+    int32_t sizeBytes;
+};
+
 struct Type {
-    struct NVector parameterTypes;   // DataType
+    struct NVector parameters;       // LocalVariable
+    int32_t parametersSizeBytes;
     DataType resultType;
 };
 
@@ -53,15 +60,17 @@ struct Instruction {
 };
 
 struct Function {
+    struct Module* module;
     struct NString name;
     int32_t typeIndex;
     struct Type* type;
-    struct NVector localVariablesTypes;  // DataType
-    struct NVector instructions;         // Instruction
+    struct NVector localVariables;   // LocalVariable
+    int32_t localVariablesSizeBytes;
+    struct NVector instructions;     // Instruction
 };
 
 struct Table {
-    struct NVector functions;            // Function*
+    struct NVector functions;        // Function*
 };
 
 struct Memory {
@@ -80,10 +89,24 @@ struct Export {
     uint32_t index;
 };
 
+struct Stack {
+    struct NByteVector data;
+};
+
+/*
+struct ReturnInfo {
+};
+
+struct CallStack { // Is this necessary?
+    struct NVector data;   // ReturnInfo
+};
+*/
+
 struct Module {
     struct Memory* memory;        // Could be imported from another machine (or parent code).
     struct Table* functionsTable; // Could be imported from another machine (or parent code).
     boolean memoryImported, tableImported;
+    struct Stack stack;
 
     struct NVector types;         // Type*
     struct NVector functions;     // Function*
@@ -131,14 +154,34 @@ static DataType getDataTypeFromString(const char* valueString) {
     return 0;
 }
 
-static void pushRuleParameterTypes(struct NCC* ncc, int32_t variablesCount, struct NVector* outVector) {
+static int32_t getDataTypeSizeBytes(DataType type) {
+    switch (type) {
+        case TYPE_INT32:
+        case TYPE_FLOAT32:
+            return 4;
+        case TYPE_INT64:
+        case TYPE_FLOAT64:
+            return 8;
+        default:
+            NERROR("ReferenceMachine.getDataTypeSizeBytes()", "Unknown datatype: %s%d%s", NTCOLOR(HIGHLIGHT), type, NTCOLOR(STREAM_DEFAULT));
+            return 0;
+    }
+}
+
+static int32_t pushRuleParameterTypes(struct NCC* ncc, int32_t variablesCount, struct NVector* outVector) {
 
     // Push variable types,
+    int32_t offset = 0;
     for (int32_t i=0; i<variablesCount; i++) {
         struct NCC_Variable variable; NCC_getRuleVariable(ncc, i, &variable);
-        DataType parameterType = getDataTypeFromString(NString.get(&variable.value));
-        NVector.pushBack(outVector, &parameterType);
+        struct LocalVariable parameter;
+        parameter.type = getDataTypeFromString(NString.get(&variable.value));
+        parameter.offset = offset;
+        parameter.sizeBytes = getDataTypeSizeBytes(parameter.type);
+        offset += parameter.sizeBytes;
+        NVector.pushBack(outVector, &parameter);
     }
+    return offset;
 }
 
 #define GET_CURRENT_TYPE \
@@ -148,7 +191,7 @@ static void pushRuleParameterTypes(struct NCC* ncc, int32_t variablesCount, stru
 
 static void onType_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     GET_CURRENT_TYPE;
-    pushRuleParameterTypes(ncc, variablesCount, &type->parameterTypes);
+    type->parametersSizeBytes = pushRuleParameterTypes(ncc, variablesCount, &type->parameters);
 }
 
 static void onType_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
@@ -161,12 +204,12 @@ static struct Type* createType() {
     struct Type* type = NMALLOC(sizeof(struct Type), "ReferenceMachine.createType() type");
     NSystemUtils.memset(type, 0, sizeof(struct Type));
 
-    NVector.initialize(&type->parameterTypes, 0, sizeof(DataType));
+    NVector.initialize(&type->parameters, 0, sizeof(struct LocalVariable));
     return type;
 }
 
 static void destroyAndFreeType(struct Type* type) {
-    NVector.destroy(&type->parameterTypes);
+    NVector.destroy(&type->parameters);
     NFREE(type, "ReferenceMachine.destroyAndFreeType() type");
 }
 
@@ -207,7 +250,7 @@ static void onFunc_TypeIndex(struct NCC* ncc, struct NString* ruleName, int32_t 
 static void onFunc_Parameters(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     GET_CURRENT_FUNCTION;
     if (!function->type) function->type = createType();
-    pushRuleParameterTypes(ncc, variablesCount, &function->type->parameterTypes);
+    pushRuleParameterTypes(ncc, variablesCount, &function->type->parameters);
 }
 
 static void onFunc_Result(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
@@ -219,16 +262,17 @@ static void onFunc_Result(struct NCC* ncc, struct NString* ruleName, int32_t var
 
 static void onFunc_Local(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
     GET_CURRENT_FUNCTION;
-    pushRuleParameterTypes(ncc, variablesCount, &function->localVariablesTypes);
+    function->localVariablesSizeBytes = pushRuleParameterTypes(ncc, variablesCount, &function->localVariables);
 }
 
-static struct Function* createFunction() {
+static struct Function* createFunction(struct Module* module) {
 
     struct Function* function = NMALLOC(sizeof(struct Function), "ReferenceMachine.createFunction() function");
     NSystemUtils.memset(function, 0, sizeof(struct Function));
 
+    function->module = module;
     NString.initialize(&function->name, "");
-    NVector.initialize(&function->localVariablesTypes, 0, sizeof(DataType));
+    NVector.initialize(&function->localVariables, 0, sizeof(struct LocalVariable));
     NVector.initialize(&function->instructions, 0, sizeof(struct Instruction));
     function->typeIndex = -1; // Not set. Can't use 0 because it's a valid type index.
 
@@ -237,7 +281,7 @@ static struct Function* createFunction() {
 
 static void destroyAndFreeFunction(struct Function* function) {
     NString.destroy(&function->name);
-    NVector.destroy(&function->localVariablesTypes);
+    NVector.destroy(&function->localVariables);
     NVector.destroy(&function->instructions);
     if (function->type) destroyAndFreeType(function->type);
     NFREE(function, "ReferenceMachine.destroyAndFreeFunction() function");
@@ -253,19 +297,19 @@ static void onFunc_Start(struct NCC* ncc, struct NString* ruleName, int32_t vari
     // Create a new function in the current module,
     struct Module* module = *(struct Module**) NVector.getLast(parsingData->modules);
 
-    struct Function* newFunction = createFunction();
+    struct Function* newFunction = createFunction(module);
     NVector.pushBack(&module->functions, &newFunction);
 }
 
 static boolean typesEqual(struct Type* type1, struct Type* type2) {
 
     if (type1->resultType != type2->resultType) return False;
-    if (NVector.size(&type1->parameterTypes) != NVector.size(&type2->parameterTypes)) return False;
+    if (NVector.size(&type1->parameters) != NVector.size(&type2->parameters)) return False;
 
-    for (int32_t i=NVector.size(&type1->parameterTypes)-1; i>=0; i--) {
-        DataType dataType1 = *(DataType*) NVector.get(&type1->parameterTypes, i);
-        DataType dataType2 = *(DataType*) NVector.get(&type2->parameterTypes, i);
-        if (dataType1 != dataType2) return False;
+    for (int32_t i=NVector.size(&type1->parameters)-1; i>=0; i--) {
+        struct LocalVariable parameter1 = *(struct LocalVariable*) NVector.get(&type1->parameters, i);
+        struct LocalVariable parameter2 = *(struct LocalVariable*) NVector.get(&type2->parameters, i);
+        if (parameter1.type != parameter2.type) return False;
     }
     return True;
 }
@@ -302,9 +346,9 @@ static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variab
             struct Type* newType = createType();
             NVector.pushBack(&module->types, &newType);
             newType->resultType = function->type->resultType;
-            for (int32_t i=NVector.size(&function->type->parameterTypes)-1; i>=0; i--) {
-                DataType dataType = *(DataType*) NVector.get(&function->type->parameterTypes, i);
-                NVector.pushBack(&newType->parameterTypes, &dataType);
+            for (int32_t i=NVector.size(&function->type->parameters)-1; i>=0; i--) {
+                struct LocalVariable parameter = *(struct LocalVariable*) NVector.get(&function->type->parameters, i);
+                NVector.pushBack(&newType->parameters, &parameter);
             }
             function->typeIndex = typesCount;
         }
@@ -319,7 +363,17 @@ static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variab
     // Dispose of the function type. It was there only because the specification allowed it, but after validation
     // it's quite useless for us,
     if (function->type) destroyAndFreeType(function->type);
-    function->type = 0;    
+    function->type = 0;
+
+    // Adjust the offsets of the local variables,
+    struct Type* type = *(struct Type**) NVector.get(&module->types, function->typeIndex);
+    if (type->parametersSizeBytes) {
+        int32_t localVariablesCount = NVector.size(&function->localVariables);
+        for (int32_t i=0; i<localVariablesCount; i++) {
+            struct LocalVariable localVariable = *(struct LocalVariable*) NVector.get(&function->localVariables, i);
+            localVariable.offset += type->parametersSizeBytes;
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -340,14 +394,18 @@ static void createAndPushInstructionNoArgument(struct NCC* ncc, InstructionType 
 }
 
 static void createAndPushInstructionWithInt32Argument(struct NCC* ncc, InstructionType instructionType) {
-    struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     union Value value;
-    value.int32 = NCString.parseInteger(NString.get(&variable.value));
+    value.int32 = 0;
+    struct NCC_Variable variable;
+    if (NCC_popRuleVariable(ncc, &variable)) {
+        value.int32 = NCString.parseInteger(NString.get(&variable.value));
+        NCC_destroyVariable(&variable);
+    }
     createAndPushInstruction(ncc, instructionType, value);
 }
 
 static void onInstruction_i32_const    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_i32_const    ); }
-static void onInstruction_i32_load8_u  (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_load8_u  ); }
+static void onInstruction_i32_load8_u  (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_i32_load8_u  ); }
 static void onInstruction_local_get    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_get    ); }
 static void onInstruction_local_set    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_set    ); }
 static void onInstruction_local_tee    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_tee    ); }
@@ -677,6 +735,8 @@ static struct Module* createModule() {
     struct Module* module = NMALLOC(sizeof(struct Module), "ReferenceMachine.createModule() module");
     NSystemUtils.memset(module, 0, sizeof(struct Module));
 
+    NByteVector.initialize(&module->stack.data, 0);
+
     NVector.initialize(&module->types    , 0, sizeof(struct Type*    ));
     NVector.initialize(&module->functions, 0, sizeof(struct Function*));
     NVector.initialize(&module->globals  , 0, sizeof(struct Global   ));
@@ -691,7 +751,10 @@ static void destroyAndFreeModule(struct Module* module) {
     if (!module->memoryImported) destroyAndFreeMemory(module->memory);
 
     // Table,
-    if (!module->tableImported) destroyAndFreeTable(module->functionsTable);
+    if (!module->tableImported && module->functionsTable) destroyAndFreeTable(module->functionsTable);
+
+    // Stack,
+    NByteVector.destroy(&module->stack.data);
 
     // Types,
     struct Type* type; while (NVector.popBack(&module->types, &type)) destroyAndFreeType(type);
@@ -771,6 +834,7 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "Parameters", "(${} param ${} ${DataType} ${} {${DataType} ${}}^*)", 0, False, False, False);
     NCC_addRule(cc, "Result", "(${} result ${} ${DataType} ${})", 0, False, False, False);
     NCC_addRule(cc, "TypeIndex", "(${} type ${} ${PositiveInteger} ${})", 0, False, False, False);
+    NCC_addRule(cc, "Offset", "offset ${} = ${} ${PositiveInteger}", 0, False, False, False);
 
     /////////////////////////////////////////////////////////////////////////////
     // Instructions
@@ -787,21 +851,21 @@ static struct NCC* prepareCC() {
     //     end
     //
     // See: https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
-    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"        , onInstruction_i32_const    , False, False, False);
-    NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u"                     , onInstruction_i32_load8_u  , False, False, False);
-    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}", onInstruction_local_get    , False, False, False);
-    NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}", onInstruction_local_set    , False, False, False);
-    NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}", onInstruction_local_tee    , False, False, False); // The same as set, but doesn't consume the value from the stack.
-    NCC_addRule(cc, "I-i32.add"      , "i32.add"                         , onInstruction_i32_add      , False, False, False);
-    NCC_addRule(cc, "I-i32.and"      , "i32.and"                         , onInstruction_i32_and      , False, False, False);
-    NCC_addRule(cc, "I-loop"         , "loop"                            , onInstruction_loop         , False, False, False);
-    NCC_addRule(cc, "I-block"        , "block"                           , onInstruction_block        , False, False, False);
-    NCC_addRule(cc, "I-end"          , "end"                             , onInstruction_end          , False, False, False);
-    NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                          , onInstruction_i32_eq       , False, False, False);
-    NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                         , onInstruction_i32_eqz      , False, False, False);
-    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"       , onInstruction_br           , False, False, False);
-    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"    , onInstruction_br_if        , False, False, False);
-    NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${TypeIndex}"  , onInstruction_call_indirect, False, False, False); // The function type is needed for type checking only.
+    NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"           , onInstruction_i32_const    , False, False, False);
+    NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u ${} ${Offset}|${Empty}" , onInstruction_i32_load8_u  , False, False, False);
+    NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}"   , onInstruction_local_get    , False, False, False);
+    NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}"   , onInstruction_local_set    , False, False, False);
+    NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}"   , onInstruction_local_tee    , False, False, False); // The same as set, but doesn't consume the value from the stack.
+    NCC_addRule(cc, "I-i32.add"      , "i32.add"                            , onInstruction_i32_add      , False, False, False);
+    NCC_addRule(cc, "I-i32.and"      , "i32.and"                            , onInstruction_i32_and      , False, False, False);
+    NCC_addRule(cc, "I-loop"         , "loop"                               , onInstruction_loop         , False, False, False);
+    NCC_addRule(cc, "I-block"        , "block"                              , onInstruction_block        , False, False, False);
+    NCC_addRule(cc, "I-end"          , "end"                                , onInstruction_end          , False, False, False);
+    NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                             , onInstruction_i32_eq       , False, False, False);
+    NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                            , onInstruction_i32_eqz      , False, False, False);
+    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"          , onInstruction_br           , False, False, False);
+    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"       , onInstruction_br_if        , False, False, False);
+    NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${TypeIndex}"     , onInstruction_call_indirect, False, False, False); // The function type is needed for type checking only.
                                                                                                                               // The indirect call pops the desired function index
                                                                                                                               // from the stack, or from a nested instruction.
     NCC_addRule(cc, "I-return"       , "return"                          , onInstruction_return       , False, False, False);
@@ -971,8 +1035,89 @@ static struct NCC* prepareCC() {
 }
 
 ///////////////////////////////////////////////////////////////////////////
+// Function execution
+///////////////////////////////////////////////////////////////////////////
+
+static void callFunction(NWM_Function functionHandle) {
+
+    struct Function* function = functionHandle;
+    struct NByteVector* stack = &function->module->stack.data;
+    struct NByteVector* memory = &function->module->memory->data;
+    struct NVector* locals = &function->localVariables;
+
+    // Compute locals pointer in the stack,
+    struct Type* functionType = *(struct Type**) NVector.get(&function->module->types, function->typeIndex);
+    uint32_t stackSize = NByteVector.size(stack);
+    uint32_t localsStartIndex = stackSize - functionType->parametersSizeBytes;
+    uint8_t* localsPointer = &stack->objects[localsStartIndex];
+
+    // Resize the stack to accommodate the locals,
+    NByteVector.resize(stack, stackSize + function->localVariablesSizeBytes);
+
+    // Execute,
+    uint32_t instructionsCount = NVector.size(&function->instructions);
+    for (int32_t i=0; i<instructionsCount; i++) {
+
+        struct Instruction* instruction = NVector.get(&function->instructions, i);
+        switch(instruction->type) {
+            case INST_i32_const:
+                NByteVector.pushBack32Bit(stack, instruction->argument.int32);
+                continue;
+            case INST_i32_load8_u: {
+                int32_t index;
+                NByteVector.popBack32Bit(stack, &index);         // Pop the index from the stack.
+                index += instruction->argument.int32;            // Add the offset.
+                int32_t value = NByteVector.get(memory, index);  // Get the value from the memory.
+                NByteVector.pushBack32Bit(stack, value);         // Push the value into the stack.
+                continue;
+            }
+            case INST_local_get: {
+
+                // TODO: locals should include parameters too...
+
+                NLOGE("sdf", "index: %d", instruction->argument.int32);
+                struct LocalVariable *localVariable = NVector.get(locals, instruction->argument.int32);
+                NLOGE("sdf", "offset: %d, size: %d", localVariable->offset, localVariable->sizeBytes);
+                NByteVector.pushBackBulk(stack, &localsPointer[localVariable->offset], localVariable->sizeBytes);
+                continue;
+            }
+            case INST_local_set:
+            case INST_local_tee:
+            case INST_i32_add:
+            case INST_i32_and:
+            case INST_loop:
+            case INST_block:
+            case INST_end:
+            case INST_i32_eq:
+            case INST_i32_eqz:
+            case INST_br:
+            case INST_br_if:
+            case INST_call_indirect:
+            case INST_return:
+            default: ;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////
 // Reference machine interface
 ///////////////////////////////////////////////////////////////////////////
+
+static NWM_Function getFunction(struct NWM_WasmMachine* machine, int32_t moduleIndex, const char* functionName) {
+
+    struct ReferenceMachineData* machineData = machine->data;
+    struct Module* module = *(struct Module**) NVector.get(&machineData->modules, moduleIndex);
+
+    // Find the function within the module,
+    // TODO: should look into exports instead?
+    for (int32_t i=NVector.size(&module->functions)-1; i>=0; i--) {
+        struct Function* function = *(struct Function**) NVector.get(&module->functions, i);
+        if (NCString.equals(NString.get(&function->name), functionName)) {
+            return function;
+        }
+    }
+    return 0;
+}
 
 static void destroyReferenceMachine(struct NWM_WasmMachine *machine) {
     machine->alive = False;
@@ -1022,6 +1167,8 @@ struct NWM_WasmMachine *NWM_initializeReferenceMachine(struct NWM_WasmMachine *o
     outputMachine->destroy = destroyReferenceMachine;
     outputMachine->destroyAndFree = destroyAndFreeReferenceMachine;
     outputMachine->parseWatCode = parseWatCode;
+    outputMachine->getFunction = getFunction;
+    outputMachine->callFunction = callFunction;
 
     // Initialize machine data,
     struct ReferenceMachineData* machineData = NMALLOC(sizeof(struct ReferenceMachineData), "ReferenceMachine.NWM_initializeReferenceMachine() machineData");

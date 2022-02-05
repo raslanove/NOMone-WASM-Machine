@@ -6,124 +6,51 @@
 
 void NMain(int argc, char *argv[]) {
 
+    // Understanding the generated code.
+    // =================================
+    // __wasm_call_ctors:
+    // ==================
+    //   An empty function, never seen it have any content. We can remove it safely.
+    //
+    // __dso_handle:
+    // =============
+    //   - A DSO (Dynamic Shared Object) is an object file that is meant to be used simultaneously (or shared) by multiple applications (.o files?) while they are executing.
+    //     See: https://www3.risc.jku.at/education/courses/ws2003/intropar/origin-new/MproCplrDbx_TG/sgi_html/ch03.html
+    //   - The __dso_handle has something to do with calling terminating functions in DSOs (see: https://itanium-cxx-abi.github.io/cxx-abi/abi.html#dso-dtor-runtime-api ).
+    //   - We don't use the __dso_handle, so you can just ignore it.
+    //
+
     char watCode[] =
             "(module\n"
             "  (type (;0;) (func))\n"
-            "  (type (;1;) (func (param i32 i32 f64) (result i32)))\n"
-            "  (type (;2;) (func (param i32 i32)))\n"
-            "  (type (;3;) (func (param i32 i32) (result i32)))\n"
-            "  (type (;4;) (func (param i32)))\n"
-            "  (type (;5;) (func (param f64) (result i32)))\n"
-            "  (type (;6;) (func (param i32) (result i32)))\n"
-            "  (type (;7;) (func (param i32 i32 i32)))\n"
-            "  (type (;8;) (func (result i32)))\n"
-            "  (type (;9;) (func (param i32 f64 i32)))\n"
-            "  (type (;10;) (func (param i32 i32 i32 i32 i32) (result i32)))\n"
+            "  (type (;1;) (func (param i32 i32) (result i32)))\n"
             "  (func $__wasm_call_ctors (type 0))\n"
-            "  (func $initialize (type 4) (param i32)\n"
-            "    block  ;; label = @1\n"
-            "      local.get 0\n"
-            "      i32.eqz\n"
-            "      br_if 0 (;@1;)\n"
-            "      local.get 0\n"
-            "      call_indirect (type 0)\n"
-            "    end)"
-            "  (func $terminate (type 0))\n"
-            "  (func $strlen (type 6) (param i32) (result i32)\n"
-            "    (local i32 i32 i32)\n"
-            "    i32.const 0\n"
-            "    local.set 1\n"
-            "    loop  ;; label = @1\n"
-            "      local.get 0\n"
-            "      local.get 1\n"
-            "      i32.add\n"
-            "      local.set 2\n"
-            "      local.get 1\n"
-            "      i32.const 1\n"
-            "      i32.add\n"
-            "      local.tee 3\n"
-            "      local.set 1\n"
-            "      local.get 2\n"
-            "      i32.load8_u\n"
-            "      br_if 0 (;@1;)\n"
-            "    end\n"
-            "    local.get 3\n"
-            "    i32.const -1\n"
-            "    i32.add)"
-            "  (func $startsWith (type 3) (param i32 i32) (result i32)\n"
-            "    (local i32 i32 i32)\n"
-            "    block  ;; label = @1\n"
-            "      block  ;; label = @2\n"
-            "        local.get 0\n"
-            "        i32.load8_u\n"
-            "        local.tee 2\n"
-            "        br_if 0 (;@2;)\n"
-            "        i32.const 0\n"
-            "        local.set 3\n"
-            "        br 1 (;@1;)\n"
-            "      end\n"
-            "      local.get 0\n"
-            "      i32.const 1\n"
-            "      i32.add\n"
-            "      local.set 4\n"
-            "      i32.const 0\n"
-            "      local.set 0\n"
-            "      loop  ;; label = @2\n"
-            "        block  ;; label = @3\n"
-            "          local.get 1\n"
-            "          local.get 0\n"
-            "          i32.add\n"
-            "          i32.load8_u\n"
-            "          local.tee 3\n"
-            "          br_if 0 (;@3;)\n"
-            "          local.get 0\n"
-            "          local.set 3\n"
-            "          br 2 (;@1;)\n"
-            "        end\n"
-            "        block  ;; label = @3\n"
-            "          local.get 2\n"
-            "          i32.const 255\n"
-            "          i32.and\n"
-            "          local.get 3\n"
-            "          i32.eq\n"
-            "          br_if 0 (;@3;)\n"
-            "          i32.const 0\n"
-            "          return\n"
-            "        end\n"
-            "        local.get 4\n"
-            "        local.get 0\n"
-            "        i32.add\n"
-            "        local.set 2\n"
-            "        local.get 0\n"
-            "        i32.const 1\n"
-            "        i32.add\n"
-            "        local.tee 3\n"
-            "        local.set 0\n"
-            "        local.get 2\n"
-            "        i32.load8_u\n"
-            "        local.tee 2\n"
-            "        br_if 0 (;@2;)\n"
-            "      end\n"
-            "    end\n"
+            "  (func $foo (type 1) (param i32 i32) (result i32)\n"
+            "    (local i32 i32)\n"
+            "    local.get 0\n"
             "    local.get 1\n"
-            "    local.get 3\n"
-            "    i32.add\n"
-            "    i32.load8_u\n"
-            "    i32.eqz)\n"
-            "  (table (;0;) 62 funcref)\n"
+            "    i32.add)\n"
+            "  (table (;0;) 1 1 funcref)\n"
             "  (memory (;0;) 2)\n"
-            "  (global (;0;) (mut i32) (i32.const 68272))\n"
-            "  (global (;1;) i32 (i32.const 1024))\n"
+            "  (global (;0;) (mut i32) (i32.const 66560))    ;; Probably the stack pointer (or base pointer). It's used for local structs.\n"
+            "  (global (;1;) i32 (i32.const 1024))           ;; __dso_handle\n"
+            "  (global (;2;) i32 (i32.const 1024))           ;; __data_end\n"
+            "  (global (;3;) i32 (i32.const 1024))           ;; __global_base\n"
+            "  (global (;4;) i32 (i32.const 66560))          ;; __heap_base (stack size(64K) + __data_end (and sometimes +8))\n"
+            "  (global (;5;) i32 (i32.const 0))              ;; __memory_base\n"
+            "  (global (;6;) i32 (i32.const 1))              ;; __table_base\n"
             "  (export \"memory\" (memory 0))\n"
             "  (export \"__wasm_call_ctors\" (func $__wasm_call_ctors))\n"
-            "  (export \"NSystem\" (global 1))\n"
-            "  (elem (;0;) (i32.const 1) func $initialize $terminate $strlen $startsWith)\n"
-            "  (data (;0;) (i32.const 1024) \"\\01\\00\\00\\00\\02\\00\\00\\00\\03\\00\\00\\00\\04\\00\\00\\00\\05\\00\\00\\00\\06\\00\\00\\00\\07\\00\\00\\00NCString.parseInteger()\\00Integer length can't exceed 10 digits and a sign. Found: %s%s\\00Only digits from 0 to 9 are allowed. Found: %s%s\\00Value too small to fit in a 32 bit integer: %s%s\\00\\08\\00\\00\\00\\09\\00\\00\\00\\0a\\00\\00\\00\\0b\\00\\00\\00\\0c\\00\\00\\00\\0d\\00\\00\\00\\0e\\00\\00\\00\\0f\\00\\00\\00\\10\\00\\00\\00\\11\\00\\00\\00\\12\\00\\00\\00\\13\\00\\00\\00\\14\\00\\00\\00NString.vAppend\\00Expected \\22%sd%s\\22 after \\22%s%%l%s\\22 in format string: %s%s\\00Unexpected sequence: \\22%s%%%c%s\\22 in format string: %s%s\\00\\00%s\\00%c\\00\\00\\00\\15\\00\\00\\00\\16\\00\\00\\00\\17\\00\\00\\00\\18\\00\\00\\00\\19\\00\\00\\00\\1a\\00\\00\\00\\1b\\00\\00\\00\\1c\\00\\00\\00\\1d\\00\\00\\00\\1e\\00\\00\\00\\1f\\00\\00\\00NByteVector.get()\\00Index out of bound: %d\\00\\00\\00\\00 \\00\\00\\00!\\00\\00\\00\\22\\00\\00\\00#\\00\\00\\00$\\00\\00\\00%\\00\\00\\00&\\00\\00\\00'\\00\\00\\00\\00NError\\00Error tag exceeded maximum length\\00Error message exceeded maximum length\\00%s\\00Unhandled errors\\00%sUnhandled errors count: %d\\00  %s: %s\\00  %s\\00\\00(\\00\\00\\00)\\00\\00\\00*\\00\\00\\00+\\00\\00\\00,\\00\\00\\00-\\00\\00\\00.\\00\\00\\00/\\00\\00\\000\\00\\00\\00ReferenceMachine.parseModule()\\00(\\00module\\00)\\00Expected: \\22%s)%s\\22 or \\22%s(%s\\22, found: \\22%s%s%s\\22\\00EOF\\00TOKEN exceeded maximum length: %s\\00Expected: \\22%s%s%s\\22, found: \\22%s%s%s\\22\\00found token: %s%s\\00ReferenceMachine.parseType()\\00type\\00;\\004\\00\\00\\005\\00\\00\\006\\00\\00\\007\\00\\00\\008\\00\\00\\009\\00\\00\\00:\\00\\00\\00;\\00\\00\\00<\\00\\00\\00=\\00\\00\\00\\1b[0m\\00\\1b[0;30m\\00\\1b[0;31m\\00\\1b[0;32m\\00\\1b[0;33m\\00\\1b[0;34m\\00\\1b[0;35m\\00\\1b[0;36m\\00\\1b[0;37m\\00\\1b[1;30m\\00\\1b[1;31m\\00\\1b[1;32m\\00\\1b[1;33m\\00\\1b[1;34m\\00\\1b[1;35m\\00\\1b[1;36m\\00\\1b[1;37m\\00\\1b[4;30m\\00\\1b[4;31m\\00\\1b[4;32m\\00\\1b[4;33m\\00\\1b[4;34m\\00\\1b[4;35m\\00\\1b[4;36m\\00\\1b[4;37m\\00\\1b[40m\\00\\1b[41m\\00\\1b[42m\\00\\1b[43m\\00\\1b[44m\\00\\1b[45m\\00\\1b[46m\\00\\1b[47m\\00\\1b[0;90m\\00\\1b[0;91m\\00\\1b[0;92m\\00\\1b[0;93m\\00\\1b[0;94m\\00\\1b[0;95m\\00\\1b[0;96m\\00\\1b[0;97m\\00\\1b[1;90m\\00\\1b[1;91m\\00\\1b[1;92m\\00\\1b[1;93m\\00\\1b[1;94m\\00\\1b[1;95m\\00\\1b[1;96m\\00\\1b[1;97m\\00\\1b[0;100m\\00\\1b[0;101m\\00\\1b[0;102m\\00\\1b[0;103m\\00\\1b[0;104m\\00\\1b[0;105m\\00\\1b[0;106m\\00\\1b[0;107m\\00\\1bNOMoneSD\\00\\00\\bc\\07\\00\\00\\c1\\07\\00\\00\\c9\\07\\00\\00\\d1\\07\\00\\00\\d9\\07\\00\\00\\e1\\07\\00\\00\\e9\\07\\00\\00\\f1\\07\\00\\00\\f9\\07\\00\\00\\01\\08\\00\\00\\09\\08\\00\\00\\11\\08\\00\\00\\19\\08\\00\\00!\\08\\00\\00)\\08\\00\\001\\08\\00\\009\\08\\00\\00A\\08\\00\\00I\\08\\00\\00Q\\08\\00\\00Y\\08\\00\\00a\\08\\00\\00i\\08\\00\\00q\\08\\00\\00y\\08\\00\\00\\81\\08\\00\\00\\87\\08\\00\\00\\8d\\08\\00\\00\\93\\08\\00\\00\\99\\08\\00\\00\\9f\\08\\00\\00\\a5\\08\\00\\00\\ab\\08\\00\\00\\b1\\08\\00\\00\\b9\\08\\00\\00\\c1\\08\\00\\00\\c9\\08\\00\\00\\d1\\08\\00\\00\\d9\\08\\00\\00\\e1\\08\\00\\00\\e9\\08\\00\\00\\f1\\08\\00\\00\\f9\\08\\00\\00\\01\\09\\00\\00\\09\\09\\00\\00\\11\\09\\00\\00\\19\\09\\00\\00!\\09\\00\\00)\\09\\00\\001\\09\\00\\00:\\09\\00\\00C\\09\\00\\00L\\09\\00\\00U\\09\\00\\00^\\09\\00\\00g\\09\\00\\00p\\09\\00\\00y\\09\\00\\00\\c9\\07\\00\\00\\d9\\07\\00\\00\\09\\09\\00\\00\\f9\\08\\00\\00(module)\\00Parsing result\\00%s\\0a\\00True\\00False\\00\")\n"
-            ")";
+            "  (export \"foo\" (func $foo))\n"
+            "  (export \"__dso_handle\" (global 1))\n"
+            "  (export \"__data_end\" (global 2))\n"
+            "  (export \"__global_base\" (global 3))\n"
+            "  (export \"__heap_base\" (global 4))\n"
+            "  (export \"__memory_base\" (global 5))\n"
+            "  (export \"__table_base\" (global 6)))";
 
     struct NWM_WasmMachine* machine = NWM.createReferenceMachine();
     boolean result = machine->parseWatCode(machine, watCode);
-    machine->destroyAndFree(machine);
 
     if (result) {
         NLOGI("Parsing result", "True\n");
@@ -131,5 +58,12 @@ void NMain(int argc, char *argv[]) {
         NLOGE("Parsing result", "False. Required match length: %s%d%s\n", NTCOLOR(HIGHLIGHT), NCString.length(watCode), NTCOLOR(STREAM_DEFAULT));
     }
 
+    // Call an arbitrary function,
+    NWM_Function function = machine->getFunction(machine, 0, "$foo");
+    if (!function) NLOGE("HelloWasm.NMain()", "Function not found.");
+    // TODO: pass parameters...
+    machine->callFunction(function);
+
+    machine->destroyAndFree(machine);
     NError.logAndTerminate();
 }

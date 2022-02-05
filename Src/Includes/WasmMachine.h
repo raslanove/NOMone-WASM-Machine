@@ -2,6 +2,8 @@
 
 #include <NTypes.h>
 
+typedef void* NWM_Function;
+
 struct NWM_WasmMachine {
     boolean alive;
     void* data;
@@ -9,6 +11,8 @@ struct NWM_WasmMachine {
     void (*destroy)(struct NWM_WasmMachine *machine);
     void (*destroyAndFree)(struct NWM_WasmMachine *machine);
     boolean (*parseWatCode)(struct NWM_WasmMachine *machine, const char *watCode);
+    NWM_Function (*getFunction)(struct NWM_WasmMachine* machine, int32_t moduleIndex, const char* functionName);
+    void (*callFunction)(NWM_Function functionHandle);
 };
 
 struct NWM_Interface {    // NOMone Wasm Machine.
