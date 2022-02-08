@@ -2,6 +2,7 @@
 #include <NSystemUtils.h>
 #include <NError.h>
 #include <NVector.h>
+#include <NByteVector.h>
 #include <NCString.h>
 
 void NMain(int argc, char *argv[]) {
@@ -26,7 +27,6 @@ void NMain(int argc, char *argv[]) {
             "  (type (;1;) (func (param i32 i32) (result i32)))\n"
             "  (func $__wasm_call_ctors (type 0))\n"
             "  (func $foo (type 1) (param i32 i32) (result i32)\n"
-            "    (local i32 i32)\n"
             "    local.get 0\n"
             "    local.get 1\n"
             "    i32.add)\n"
@@ -61,9 +61,13 @@ void NMain(int argc, char *argv[]) {
     // Call an arbitrary function,
     NWM_Function function = machine->getFunction(machine, 0, "$foo");
     if (!function) NLOGE("HelloWasm.NMain()", "Function not found.");
-    // TODO: pass parameters...
+
+    struct NByteVector* machineStack = machine->getStack(machine, 0);
+    NByteVector.pushBack32Bit(machineStack, 5);
+    NByteVector.pushBack32Bit(machineStack, 7);
     machine->callFunction(function);
 
+    // Clean up,
     machine->destroyAndFree(machine);
     NError.logAndTerminate();
 }

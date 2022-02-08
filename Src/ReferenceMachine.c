@@ -365,13 +365,29 @@ static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variab
     if (function->type) destroyAndFreeType(function->type);
     function->type = 0;
 
-    // Adjust the offsets of the local variables,
+    // Parameters are local variables too, so add them to the local variables vector,
     struct Type* type = *(struct Type**) NVector.get(&module->types, function->typeIndex);
     if (type->parametersSizeBytes) {
+
+        int32_t parametersCount = NVector.size(&type->parameters);
         int32_t localVariablesCount = NVector.size(&function->localVariables);
-        for (int32_t i=0; i<localVariablesCount; i++) {
-            struct LocalVariable localVariable = *(struct LocalVariable*) NVector.get(&function->localVariables, i);
-            localVariable.offset += type->parametersSizeBytes;
+        NVector.resize(&function->localVariables, parametersCount + localVariablesCount);
+
+        // Move the local variables to make space for the parameters at the beginning of the vector,
+        for (int32_t i=localVariablesCount-1; i>=0; i--) {
+            struct LocalVariable* localVariableSrc  = NVector.get(&function->localVariables,                 i);
+            struct LocalVariable* localVariableDest = NVector.get(&function->localVariables, parametersCount+i);
+            *localVariableDest = *localVariableSrc;
+
+            // Adjust the offsets of local variables,
+            localVariableDest->offset += type->parametersSizeBytes;
+        }
+
+        // Insert the parameters at the beginning of the vector,
+        for (int32_t i=0; i<parametersCount; i++) {
+            struct LocalVariable* localVariableSrc  = NVector.get(&type    ->parameters    , i);
+            struct LocalVariable* localVariableDest = NVector.get(&function->localVariables, i);
+            *localVariableDest = *localVariableSrc;
         }
     }
 }
@@ -1049,7 +1065,6 @@ static void callFunction(NWM_Function functionHandle) {
     struct Type* functionType = *(struct Type**) NVector.get(&function->module->types, function->typeIndex);
     uint32_t stackSize = NByteVector.size(stack);
     uint32_t localsStartIndex = stackSize - functionType->parametersSizeBytes;
-    uint8_t* localsPointer = &stack->objects[localsStartIndex];
 
     // Resize the stack to accommodate the locals,
     NByteVector.resize(stack, stackSize + function->localVariablesSizeBytes);
@@ -1073,12 +1088,15 @@ static void callFunction(NWM_Function functionHandle) {
             }
             case INST_local_get: {
 
-                // TODO: locals should include parameters too...
-
-                NLOGE("sdf", "index: %d", instruction->argument.int32);
+                // Note: locals include parameters too.
                 struct LocalVariable *localVariable = NVector.get(locals, instruction->argument.int32);
-                NLOGE("sdf", "offset: %d, size: %d", localVariable->offset, localVariable->sizeBytes);
-                NByteVector.pushBackBulk(stack, &localsPointer[localVariable->offset], localVariable->sizeBytes);
+
+                // Pushing anything into a vector has the potential to invalidate all pointers
+                // referring to its elements. Thus, we can't push from a vector to itself, for
+                // a resize could occur, invalidating the src pointer, unless we are sure that
+                // a resize won't take place,
+                NByteVector.ensureCapacity(stack, localVariable->sizeBytes);
+                NByteVector.pushBackBulk(stack, &stack->objects[localsStartIndex + localVariable->offset], localVariable->sizeBytes);
                 continue;
             }
             case INST_local_set:
@@ -1097,11 +1115,20 @@ static void callFunction(NWM_Function functionHandle) {
             default: ;
         }
     }
+
+    // TODO: Pop local variables and parameters, and move the return value to the top of the
+    // stack...
 }
 
 ///////////////////////////////////////////////////////////////////////////
 // Reference machine interface
 ///////////////////////////////////////////////////////////////////////////
+
+struct NByteVector* getStack(struct NWM_WasmMachine *machine, int32_t moduleIndex) {
+    struct ReferenceMachineData* machineData = machine->data;
+    struct Module* module = *(struct Module**) NVector.get(&machineData->modules, moduleIndex);
+    return &module->stack.data;
+}
 
 static NWM_Function getFunction(struct NWM_WasmMachine* machine, int32_t moduleIndex, const char* functionName) {
 
@@ -1167,6 +1194,7 @@ struct NWM_WasmMachine *NWM_initializeReferenceMachine(struct NWM_WasmMachine *o
     outputMachine->destroy = destroyReferenceMachine;
     outputMachine->destroyAndFree = destroyAndFreeReferenceMachine;
     outputMachine->parseWatCode = parseWatCode;
+    outputMachine->getStack = getStack;
     outputMachine->getFunction = getFunction;
     outputMachine->callFunction = callFunction;
 
