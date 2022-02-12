@@ -1100,9 +1100,21 @@ static void callFunction(NWM_Function functionHandle) {
                 NByteVector.pushBackBulk(stack, &stack->objects[localsStartIndex + localVariable->offset], localVariable->sizeBytes);
                 continue;
             }
-            case INST_local_set:
-            case INST_local_tee:
+            case INST_local_set: {
+                struct LocalVariable *localVariable = NVector.get(locals, instruction->argument.int32);
+                int64_t value=0;
+                NByteVector.popBackBulk(stack, &value, localVariable->sizeBytes);
+                NSystemUtils.memcpy(&stack->objects[localsStartIndex + localVariable->offset], &value, localVariable->sizeBytes);
                 continue;
+            }
+            case INST_local_tee: {
+                struct LocalVariable *localVariable = NVector.get(locals, instruction->argument.int32);
+                NSystemUtils.memcpy(
+                        &stack->objects[localsStartIndex + localVariable->offset],
+                        &stack->objects[stack->size - localVariable->sizeBytes],
+                        localVariable->sizeBytes);
+                continue;
+            }
             case INST_i32_add: {
                 int32_t value1, value2;
                 NByteVector.popBack32Bit(stack, &value2);
