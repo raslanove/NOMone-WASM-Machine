@@ -20,6 +20,14 @@ void NMain(int argc, char *argv[]) {
     //   - The __dso_handle has something to do with calling terminating functions in DSOs (see: https://itanium-cxx-abi.github.io/cxx-abi/abi.html#dso-dtor-runtime-api ).
     //   - We don't use the __dso_handle, so you can just ignore it.
     //
+    //
+    //  (global (;0;) (mut i32) (i32.const 66560))    ;; Probably the stack pointer (or base pointer). It's used for local structs.\n"
+    //  (global (;1;) i32 (i32.const 1024))           ;; __dso_handle\n"
+    //  (global (;2;) i32 (i32.const 1024))           ;; __data_end\n"
+    //  (global (;3;) i32 (i32.const 1024))           ;; __global_base\n"
+    //  (global (;4;) i32 (i32.const 66560))          ;; __heap_base (stack size(64K) + __data_end (and sometimes +8))\n"
+    //  (global (;5;) i32 (i32.const 0))              ;; __memory_base\n"
+    //  (global (;6;) i32 (i32.const 1))              ;; __table_base\n"
 
     char watCode[] =
             "(module\n"
@@ -27,18 +35,18 @@ void NMain(int argc, char *argv[]) {
             "  (type (;1;) (func (param i32 i32) (result i32)))\n"
             "  (func $__wasm_call_ctors (type 0))\n"
             "  (func $foo (type 1) (param i32 i32) (result i32)\n"
-            "    local.get 0\n"
             "    local.get 1\n"
+            "    local.get 0\n"
             "    i32.add)\n"
             "  (table (;0;) 1 1 funcref)\n"
-            "  (memory (;0;) 2)\n"
-            "  (global (;0;) (mut i32) (i32.const 66560))    ;; Probably the stack pointer (or base pointer). It's used for local structs.\n"
-            "  (global (;1;) i32 (i32.const 1024))           ;; __dso_handle\n"
-            "  (global (;2;) i32 (i32.const 1024))           ;; __data_end\n"
-            "  (global (;3;) i32 (i32.const 1024))           ;; __global_base\n"
-            "  (global (;4;) i32 (i32.const 66560))          ;; __heap_base (stack size(64K) + __data_end (and sometimes +8))\n"
-            "  (global (;5;) i32 (i32.const 0))              ;; __memory_base\n"
-            "  (global (;6;) i32 (i32.const 1))              ;; __table_base\n"
+            "  (memory (;0;) 1)\n"
+            "  (global (;0;) (mut i32) (i32.const 11024))\n"
+            "  (global (;1;) i32 (i32.const 1024))\n"
+            "  (global (;2;) i32 (i32.const 1024))\n"
+            "  (global (;3;) i32 (i32.const 1024))\n"
+            "  (global (;4;) i32 (i32.const 11024))\n"
+            "  (global (;5;) i32 (i32.const 0))\n"
+            "  (global (;6;) i32 (i32.const 1))\n"
             "  (export \"memory\" (memory 0))\n"
             "  (export \"__wasm_call_ctors\" (func $__wasm_call_ctors))\n"
             "  (export \"foo\" (func $foo))\n"
@@ -66,8 +74,12 @@ void NMain(int argc, char *argv[]) {
     NByteVector.pushBack32Bit(machineStack, 5);
     NByteVector.pushBack32Bit(machineStack, 7);
     machine->callFunction(function);
+    int32_t returnValue;
+    NByteVector.popBack32Bit(machineStack, &returnValue);
+    NLOGI("HelloWasm.NMain()", "Result: %d", returnValue);
 
     // Clean up,
+    NLOGI("", "");
     machine->destroyAndFree(machine);
     NError.logAndTerminate();
 }

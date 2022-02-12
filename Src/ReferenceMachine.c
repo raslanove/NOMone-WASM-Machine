@@ -390,6 +390,7 @@ static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variab
             *localVariableDest = *localVariableSrc;
         }
     }
+    function->localVariablesSizeBytes += type->parametersSizeBytes;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -1067,7 +1068,7 @@ static void callFunction(NWM_Function functionHandle) {
     uint32_t localsStartIndex = stackSize - functionType->parametersSizeBytes;
 
     // Resize the stack to accommodate the locals,
-    NByteVector.resize(stack, stackSize + function->localVariablesSizeBytes);
+    NByteVector.resize(stack, localsStartIndex + function->localVariablesSizeBytes);
 
     // Execute,
     uint32_t instructionsCount = NVector.size(&function->instructions);
@@ -1101,7 +1102,15 @@ static void callFunction(NWM_Function functionHandle) {
             }
             case INST_local_set:
             case INST_local_tee:
-            case INST_i32_add:
+                continue;
+            case INST_i32_add: {
+                int32_t value1, value2;
+                NByteVector.popBack32Bit(stack, &value2);
+                NByteVector.popBack32Bit(stack, &value1);
+                value1 += value2;
+                NByteVector.pushBack32Bit(stack, value1);
+                continue;
+            }
             case INST_i32_and:
             case INST_loop:
             case INST_block:
@@ -1111,13 +1120,23 @@ static void callFunction(NWM_Function functionHandle) {
             case INST_br:
             case INST_br_if:
             case INST_call_indirect:
+                continue;
             case INST_return:
+                goto functionEnd;
             default: ;
         }
     }
 
-    // TODO: Pop local variables and parameters, and move the return value to the top of the
-    // stack...
+functionEnd:
+
+    // Discard local variables and parameters, and move the return value to the top of the stack,
+    if (functionType->resultType) {
+        int64_t result = 0;
+        int32_t resultSize = getDataTypeSizeBytes(functionType->resultType);
+        NByteVector.popBackBulk(stack, &result, resultSize);
+        NByteVector.resize(stack, localsStartIndex);
+        NByteVector.pushBackBulk(stack, &result, resultSize);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////
