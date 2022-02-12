@@ -1057,6 +1057,10 @@ static struct NCC* prepareCC() {
 
 static void callFunction(NWM_Function functionHandle) {
 
+    #define NOT_IMPLEMENTED_YET(instruction) \
+    NLOGE("ReferenceMachine.callFunction()", "Instruction %s" #instruction "%s not implemented yet.", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT)); \
+    continue
+
     struct Function* function = functionHandle;
     struct NByteVector* stack = &function->module->stack.data;
     struct NByteVector* memory = &function->module->memory->data;
@@ -1088,7 +1092,6 @@ static void callFunction(NWM_Function functionHandle) {
                 continue;
             }
             case INST_local_get: {
-
                 // Note: locals include parameters too.
                 struct LocalVariable *localVariable = NVector.get(locals, instruction->argument.int32);
 
@@ -1123,16 +1126,15 @@ static void callFunction(NWM_Function functionHandle) {
                 NByteVector.pushBack32Bit(stack, value1);
                 continue;
             }
-            case INST_i32_and:
-            case INST_loop:
-            case INST_block:
-            case INST_end:
-            case INST_i32_eq:
-            case INST_i32_eqz:
-            case INST_br:
-            case INST_br_if:
-            case INST_call_indirect:
-                continue;
+            case INST_i32_and: NOT_IMPLEMENTED_YET(i32.and);
+            case INST_loop: NOT_IMPLEMENTED_YET(loop);
+            case INST_block: NOT_IMPLEMENTED_YET(block);
+            case INST_end: NOT_IMPLEMENTED_YET(end);
+            case INST_i32_eq: NOT_IMPLEMENTED_YET(i32.eq);
+            case INST_i32_eqz: NOT_IMPLEMENTED_YET(i32.eqz);
+            case INST_br: NOT_IMPLEMENTED_YET(br);
+            case INST_br_if: NOT_IMPLEMENTED_YET(br_if);
+            case INST_call_indirect: NOT_IMPLEMENTED_YET(call_indirect);
             case INST_return:
                 goto functionEnd;
             default: ;

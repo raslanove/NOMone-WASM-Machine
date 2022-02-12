@@ -37,6 +37,7 @@ void NMain(int argc, char *argv[]) {
             "  (func $foo (type 1) (param i32 i32) (result i32)\n"
             "    local.get 1\n"
             "    local.get 0\n"
+            "    end\n"
             "    i32.add)\n"
             "  (table (;0;) 1 1 funcref)\n"
             "  (memory (;0;) 1)\n"
