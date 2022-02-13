@@ -18,11 +18,16 @@ typedef enum { TYPE_NONE=0, TYPE_INT32, TYPE_INT64, TYPE_FLOAT32, TYPE_FLOAT64 }
 typedef enum { TYPE_MEMORY, TYPE_GLOBAL, TYPE_FUNC } ExportType;
 typedef enum {
     INST_i32_const,
+    INST_i32_load,
     INST_i32_load8_u,
+    INST_i32_store,
     INST_local_get,
     INST_local_set,
     INST_local_tee,
+    INST_global_get,
+    INST_global_set,
     INST_i32_add,
+    INST_i32_sub,
     INST_i32_and,
     INST_loop,
     INST_block,
@@ -81,6 +86,7 @@ struct Global {
     DataType type;
     union Value value;
     boolean mutable;
+    int32_t sizeBytes;
 };
 
 struct Export {
@@ -422,11 +428,16 @@ static void createAndPushInstructionWithInt32Argument(struct NCC* ncc, Instructi
 }
 
 static void onInstruction_i32_const    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_i32_const    ); }
+static void onInstruction_i32_load     (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_i32_load     ); }
 static void onInstruction_i32_load8_u  (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_i32_load8_u  ); }
+static void onInstruction_i32_store    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_i32_store    ); }
 static void onInstruction_local_get    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_get    ); }
 static void onInstruction_local_set    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_set    ); }
 static void onInstruction_local_tee    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_local_tee    ); }
+static void onInstruction_global_get   (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_global_get   ); }
+static void onInstruction_global_set   (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_global_set   ); }
 static void onInstruction_i32_add      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_add      ); }
+static void onInstruction_i32_sub      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_sub      ); }
 static void onInstruction_i32_and      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_and      ); }
 static void onInstruction_loop         (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_loop         ); }
 static void onInstruction_block        (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_block        ); }
@@ -526,6 +537,7 @@ static void onGlobal_DataType(struct NCC* ncc, struct NString* ruleName, int32_t
     GET_CURRENT_GLOBAL;
     struct NCC_Variable variable; NCC_getRuleVariable(ncc, 0, &variable);
     global->type = getDataTypeFromString(NString.get(&variable.value));
+    global->sizeBytes = getDataTypeSizeBytes(global->type);
 }
 
 static void onGlobal_Mutable(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
@@ -868,12 +880,18 @@ static struct NCC* prepareCC() {
     //     end
     //
     // See: https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
+
     NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"           , onInstruction_i32_const    , False, False, False);
+    NCC_addRule(cc, "I-i32.load"     , "i32.load ${} ${Offset}|${Empty}"    , onInstruction_i32_load     , False, False, False);
     NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u ${} ${Offset}|${Empty}" , onInstruction_i32_load8_u  , False, False, False);
+    NCC_addRule(cc, "I-i32.store"    , "i32.store ${} ${Offset}|${Empty}"   , onInstruction_i32_store    , False, False, False);
     NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}"   , onInstruction_local_get    , False, False, False);
     NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}"   , onInstruction_local_set    , False, False, False);
     NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}"   , onInstruction_local_tee    , False, False, False); // The same as set, but doesn't consume the value from the stack.
+    NCC_addRule(cc, "I-global.get"   , "global.get ${} ${PositiveInteger}"  , onInstruction_global_get   , False, False, False);
+    NCC_addRule(cc, "I-global.set"   , "global.set ${} ${PositiveInteger}"  , onInstruction_global_set   , False, False, False);
     NCC_addRule(cc, "I-i32.add"      , "i32.add"                            , onInstruction_i32_add      , False, False, False);
+    NCC_addRule(cc, "I-i32.sub"      , "i32.sub"                            , onInstruction_i32_sub      , False, False, False);
     NCC_addRule(cc, "I-i32.and"      , "i32.and"                            , onInstruction_i32_and      , False, False, False);
     NCC_addRule(cc, "I-loop"         , "loop"                               , onInstruction_loop         , False, False, False);
     NCC_addRule(cc, "I-block"        , "block"                              , onInstruction_block        , False, False, False);
@@ -889,11 +907,16 @@ static struct NCC* prepareCC() {
 
 
     NCC_addRule(cc, "Instruction", "${I-i32.const}     |"
+                                   "${I-i32.load}      |"
                                    "${I-i32.load8_u}   |"
+                                   "${I-i32.store}     |"
                                    "${I-local.get}     |"
                                    "${I-local.set}     |"
                                    "${I-local.tee}     |"
+                                   "${I-global.get}    |"
+                                   "${I-global.set}    |"
                                    "${I-i32.add}       |"
+                                   "${I-i32.sub}       |"
                                    "${I-i32.and}       |"
                                    "${I-loop}          |"
                                    "${I-block}         |"
@@ -1062,8 +1085,10 @@ static void callFunction(NWM_Function functionHandle) {
     continue
 
     struct Function* function = functionHandle;
-    struct NByteVector* stack = &function->module->stack.data;
-    struct NByteVector* memory = &function->module->memory->data;
+    struct Module* module = function->module;
+    struct NByteVector* stack = &module->stack.data;
+    struct NByteVector* memory = &module->memory->data;
+    struct NVector* globals = &module->globals;
     struct NVector* locals = &function->localVariables;
 
     // Compute locals pointer in the stack,
@@ -1083,12 +1108,25 @@ static void callFunction(NWM_Function functionHandle) {
             case INST_i32_const:
                 NByteVector.pushBack32Bit(stack, instruction->argument.int32);
                 continue;
+            case INST_i32_load: {
+                int32_t index; NByteVector.popBack32Bit(stack, &index); // Pop the index from the stack.
+                index += instruction->argument.int32;                   // Add the offset.
+                int32_t value; NSystemUtils.memcpy(&value, &memory->objects[index], 4); // Get the value from the memory.
+                NByteVector.pushBack32Bit(stack, value);                // Push the value into the stack.
+                continue;
+            }
             case INST_i32_load8_u: {
-                int32_t index;
-                NByteVector.popBack32Bit(stack, &index);         // Pop the index from the stack.
-                index += instruction->argument.int32;            // Add the offset.
-                int32_t value = NByteVector.get(memory, index);  // Get the value from the memory.
-                NByteVector.pushBack32Bit(stack, value);         // Push the value into the stack.
+                int32_t index; NByteVector.popBack32Bit(stack, &index); // Pop the index from the stack.
+                index += instruction->argument.int32;                   // Add the offset.
+                int32_t value = NByteVector.get(memory, index);         // Get the value from the memory.
+                NByteVector.pushBack32Bit(stack, value);                // Push the value into the stack.
+                continue;
+            }
+            case INST_i32_store: {
+                int32_t value; NByteVector.popBack32Bit(stack, &value);  // Pop the value from the stack.
+                int32_t index; NByteVector.popBack32Bit(stack, &index);  // Pop the index from the stack.
+                index += instruction->argument.int32;                    // Add the offset.
+                NSystemUtils.memcpy(&memory->objects[index], &value, 4); // Set the value in the memory.
                 continue;
             }
             case INST_local_get: {
@@ -1118,11 +1156,29 @@ static void callFunction(NWM_Function functionHandle) {
                         localVariable->sizeBytes);
                 continue;
             }
+            case INST_global_get: {
+                struct Global* globalVariable = NVector.get(globals, instruction->argument.int32);
+                NByteVector.pushBackBulk(stack, &globalVariable->value, globalVariable->sizeBytes);
+                continue;
+            }
+            case INST_global_set: {
+                struct Global* globalVariable = NVector.get(globals, instruction->argument.int32);
+                NByteVector.popBackBulk(stack, &globalVariable->value, globalVariable->sizeBytes);
+                continue;
+            }
             case INST_i32_add: {
                 int32_t value1, value2;
                 NByteVector.popBack32Bit(stack, &value2);
                 NByteVector.popBack32Bit(stack, &value1);
                 value1 += value2;
+                NByteVector.pushBack32Bit(stack, value1);
+                continue;
+            }
+            case INST_i32_sub: {
+                int32_t value1, value2;
+                NByteVector.popBack32Bit(stack, &value2);
+                NByteVector.popBack32Bit(stack, &value1);
+                value1 -= value2;
                 NByteVector.pushBack32Bit(stack, value1);
                 continue;
             }

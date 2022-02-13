@@ -1,6 +1,6 @@
 #clang --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--export-all -o result.wasm src.c
 #clang --target=wasm32 -O3 -flto -nostdlib -Wl,--no-entry -Wl,--export-all -Wl,--lto-O3 -Wl,-z,stack-size=$[10000] -o result.wasm src.c
-clang --target=wasm32 -O1 -nostdlib -Wl,--no-entry -Wl,--export-all -Wl,-z,stack-size=$[10000] -o result.wasm src.c
+clang --target=wasm32 -O0 -nostdlib -Wl,--no-entry -Wl,--export-all -Wl,-z,stack-size=$[10000] -o result.wasm src.c
 
 #clang \
 #  --target=wasm32 \
