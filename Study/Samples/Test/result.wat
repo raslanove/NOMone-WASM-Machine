@@ -28,7 +28,7 @@
     i32.store
     block  ;; label = @1
       loop  ;; label = @2
-        i32.const 10
+        i32.const 100000000
         local.set 6
         local.get 4
         i32.load
