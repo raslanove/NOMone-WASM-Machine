@@ -1222,6 +1222,9 @@ static void callFunction(NWM_Function functionHandle) {
     // Resize the stack to accommodate the locals,
     NByteVector.resize(stack, localsStartIndex + function->localVariablesSizeBytes);
 
+    // Some validation (TODO: make optional?),
+    int32_t expectedExitStackSize = function->localVariablesSizeBytes + getDataTypeSizeBytes(functionType->resultType);
+
     // Execute,
     uint32_t instructionsCount = NVector.size(&function->instructions);
     for (int32_t ip=0; ip<instructionsCount; ip++) {
@@ -1351,6 +1354,11 @@ static void callFunction(NWM_Function functionHandle) {
     }
 
 functionEnd:
+
+    // Check if the stack has unused data,
+    if (NByteVector.size(stack) != expectedExitStackSize) {
+        NLOGW("ReferenceMachine.callFunction()", "Upon exit from function %s%s%s, expected stack size is %s%d%s, got %s%d%s.", NTCOLOR(HIGHLIGHT), NString.get(&function->name), NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), expectedExitStackSize, NTCOLOR(STREAM_DEFAULT), NTCOLOR(HIGHLIGHT), NByteVector.size(stack), NTCOLOR(STREAM_DEFAULT));
+    }
 
     // Discard local variables and parameters, and move the return value to the top of the stack,
     if (functionType->resultType) {
