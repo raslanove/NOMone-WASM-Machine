@@ -8,7 +8,7 @@
 
 #include <NCC.h>
 
-#define NWM_VERBOSE 1
+//#define NWM_VERBOSE 1
 
 ///////////////////////////////////////////////////////////////////////////
 // Types
@@ -29,13 +29,14 @@ typedef enum {
     INST_i32_add,
     INST_i32_sub,
     INST_i32_and,
-    INST_loop,
     INST_block,
+    INST_loop,
     INST_end,
-    INST_i32_eq,
-    INST_i32_eqz,
     INST_br,
     INST_br_if,
+    INST_i32_eq,
+    INST_i32_eqz,
+    INST_i32_lt_s,
     INST_call_indirect,
     INST_return
 } InstructionType;
@@ -320,6 +321,110 @@ static boolean typesEqual(struct Type* type1, struct Type* type2) {
     return True;
 }
 
+struct Block {
+    int32_t branchDestinationInstructionIndex;
+    int32_t parentBlockIndex;
+};
+
+// Returns the instruction index where the function stopped scanning,
+static int32_t getFunctionBlocks(struct Function* function, int32_t instructionStartIndex, int32_t parentBlockIndex, struct NVector* outBlocks) {
+
+    // Find blocks,
+    struct NVector* instructions = &function->instructions;
+    int32_t instructionsCount = NVector.size(instructions);
+    for (int32_t i=instructionStartIndex; i<instructionsCount; i++) {
+
+        struct Instruction* blockInstruction = NVector.get(instructions, i);
+        if (blockInstruction->type == INST_block || blockInstruction->type == INST_loop) {
+
+            // Create a new block,
+            int32_t currentBlockIndex = NVector.size(outBlocks);
+            struct Block* currentBlock = NVector.emplaceBack(outBlocks);
+            currentBlock->parentBlockIndex = parentBlockIndex;
+
+            // If it's a loop, we don't have to find the end to compute the branch destination,
+            if (blockInstruction->type == INST_loop) currentBlock->branchDestinationInstructionIndex = i+1;
+
+            // Found a block, find its end,
+            for (i++; i<instructionsCount; i++) {
+                struct Instruction* endInstruction = NVector.get(instructions, i);
+                if (endInstruction->type == INST_end) {
+                    currentBlock = NVector.get(outBlocks, currentBlockIndex);
+                    if (blockInstruction->type == INST_block) currentBlock->branchDestinationInstructionIndex = i+1;
+                    break;
+                } else if (endInstruction->type == INST_block || endInstruction->type == INST_loop) {
+
+                    // Found a nested block,
+                    i = getFunctionBlocks(function, i, currentBlockIndex, outBlocks);
+                }
+            }
+        } else if (blockInstruction->type == INST_end) {
+
+            // If this was the topmost block,
+            if (instructionStartIndex==0) {
+                NERROR("ReferenceMachine.getFunctionBlocks()", "Found an %send%s instruction not within any block.", NTCOLOR(HIGHLIGHT), NTCOLOR(STREAM_DEFAULT));
+                return 0;
+            }
+
+            // It appears we were called on a nested block, return to parent call,
+            return i-1;
+        }
+    }
+
+    return instructionsCount;
+}
+
+// Returns the instruction index where the function stopped scanning,
+static int32_t resolveBranchDestinations(struct Function* function, int32_t instructionStartIndex, int32_t* currentBlockIndex, struct NVector* blocks) {
+
+    // Hard-code destinations in branch instructions,
+    // TODO: for table branching, we should construct tables with all the defined destinations...
+
+    // Find blocks,
+    struct NVector* instructions = &function->instructions;
+    int32_t instructionsCount = NVector.size(instructions);
+    for (int32_t i=instructionStartIndex; i<instructionsCount; i++) {
+
+        struct Instruction* blockInstruction = NVector.get(instructions, i);
+        if (blockInstruction->type == INST_block || blockInstruction->type == INST_loop) {
+
+            // Found a block,
+            struct Block* currentBlock = NVector.get(blocks, ++(*currentBlockIndex));
+
+            // Adjust branch destinations of child instructions,
+            for (i++; i<instructionsCount; i++) {
+                struct Instruction* branchInstruction = NVector.get(instructions, i);
+                if (branchInstruction->type == INST_br || branchInstruction->type == INST_br_if) {
+
+                    // Find the correct branch destination,
+                    struct Block* destinationBlock = currentBlock;
+                    for (int32_t j=branchInstruction->argument.int32; j>0; j--) {
+                        if (destinationBlock->parentBlockIndex == -1) {
+                            NERROR("ReferenceMachine.resolveBranchDestinations()", "Found an %sbr/br_if %d%s instruction that goes beyond the outer block.", NTCOLOR(HIGHLIGHT), branchInstruction->argument.int32, NTCOLOR(STREAM_DEFAULT));
+                            return instructionsCount;
+                        }
+                        destinationBlock = NVector.get(blocks, destinationBlock->parentBlockIndex);
+                    }
+
+                    // Set the branch destination into the instruction,
+                    branchInstruction->argument.int32 = destinationBlock->branchDestinationInstructionIndex;
+
+                } else if (branchInstruction->type == INST_block || branchInstruction->type == INST_loop) {
+
+                    // Found a nested block,
+                    i = resolveBranchDestinations(function, i, currentBlockIndex, blocks);
+
+                } else if (branchInstruction->type == INST_end) {
+                    if (instructionStartIndex==0) break ;
+                    return i;
+                }
+            }
+        }
+    }
+
+    return instructionsCount;
+}
+
 static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) {
 
     GET_CURRENT_FUNCTION;
@@ -397,6 +502,21 @@ static void onFunc_End(struct NCC* ncc, struct NString* ruleName, int32_t variab
         }
     }
     function->localVariablesSizeBytes += type->parametersSizeBytes;
+
+    // Resolve branch destination using a recursive function and two passes. The first pass should
+    // identify block branch destination (beginning or end depending on block type). The second pass
+    // should hard-code the destination into branch instructions. For table branching, we should
+    // construct tables with all the defined destinations.
+
+    // Get code blocks within this function,
+    struct NVector blocks;
+    NVector.initialize(&blocks, 0, sizeof(struct Block));
+    getFunctionBlocks(function, 0, -1, &blocks);
+
+    // Pre-compute the branch destinations and clean up,
+    int32_t parentBlockIndex = -1;
+    resolveBranchDestinations(function, 0, &parentBlockIndex, &blocks);
+    NVector.destroy(&blocks);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -439,13 +559,14 @@ static void onInstruction_global_set   (struct NCC* ncc, struct NString* ruleNam
 static void onInstruction_i32_add      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_add      ); }
 static void onInstruction_i32_sub      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_sub      ); }
 static void onInstruction_i32_and      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_and      ); }
-static void onInstruction_loop         (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_loop         ); }
 static void onInstruction_block        (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_block        ); }
+static void onInstruction_loop         (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_loop         ); }
 static void onInstruction_end          (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_end          ); }
-static void onInstruction_i32_eq       (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_eq       ); }
-static void onInstruction_i32_eqz      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_eqz      ); }
 static void onInstruction_br           (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_br           ); }
 static void onInstruction_br_if        (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_br_if        ); }
+static void onInstruction_i32_eq       (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_eq       ); }
+static void onInstruction_i32_eqz      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_eqz      ); }
+static void onInstruction_i32_lt_s     (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_lt_s     ); }
 static void onInstruction_call_indirect(struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionWithInt32Argument(ncc, INST_call_indirect); }
 static void onInstruction_return       (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_return       ); }
 
@@ -882,9 +1003,9 @@ static struct NCC* prepareCC() {
     // See: https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
 
     NCC_addRule(cc, "I-i32.const"    , "i32.const ${} ${Integer}"           , onInstruction_i32_const    , False, False, False);
-    NCC_addRule(cc, "I-i32.load"     , "i32.load ${} ${Offset}|${Empty}"    , onInstruction_i32_load     , False, False, False);
+    NCC_addRule(cc, "I-i32.load"     , "i32.load    ${} ${Offset}|${Empty}" , onInstruction_i32_load     , False, False, False);
     NCC_addRule(cc, "I-i32.load8_u"  , "i32.load8_u ${} ${Offset}|${Empty}" , onInstruction_i32_load8_u  , False, False, False);
-    NCC_addRule(cc, "I-i32.store"    , "i32.store ${} ${Offset}|${Empty}"   , onInstruction_i32_store    , False, False, False);
+    NCC_addRule(cc, "I-i32.store"    , "i32.store   ${} ${Offset}|${Empty}" , onInstruction_i32_store    , False, False, False);
     NCC_addRule(cc, "I-local.get"    , "local.get ${} ${PositiveInteger}"   , onInstruction_local_get    , False, False, False);
     NCC_addRule(cc, "I-local.set"    , "local.set ${} ${PositiveInteger}"   , onInstruction_local_set    , False, False, False);
     NCC_addRule(cc, "I-local.tee"    , "local.tee ${} ${PositiveInteger}"   , onInstruction_local_tee    , False, False, False); // The same as set, but doesn't consume the value from the stack.
@@ -893,13 +1014,14 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "I-i32.add"      , "i32.add"                            , onInstruction_i32_add      , False, False, False);
     NCC_addRule(cc, "I-i32.sub"      , "i32.sub"                            , onInstruction_i32_sub      , False, False, False);
     NCC_addRule(cc, "I-i32.and"      , "i32.and"                            , onInstruction_i32_and      , False, False, False);
-    NCC_addRule(cc, "I-loop"         , "loop"                               , onInstruction_loop         , False, False, False);
-    NCC_addRule(cc, "I-block"        , "block"                              , onInstruction_block        , False, False, False);
+    NCC_addRule(cc, "I-block"        , "block ${} ${Result}|${Empty}"       , onInstruction_block        , False, False, False);
+    NCC_addRule(cc, "I-loop"         , "loop  ${} ${Result}|${Empty}"       , onInstruction_loop         , False, False, False);
     NCC_addRule(cc, "I-end"          , "end"                                , onInstruction_end          , False, False, False);
+    NCC_addRule(cc, "I-br"           , "br    ${} ${PositiveInteger}"       , onInstruction_br           , False, False, False);
+    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"       , onInstruction_br_if        , False, False, False);
     NCC_addRule(cc, "I-i32.eq"       , "i32.eq"                             , onInstruction_i32_eq       , False, False, False);
     NCC_addRule(cc, "I-i32.eqz"      , "i32.eqz"                            , onInstruction_i32_eqz      , False, False, False);
-    NCC_addRule(cc, "I-br"           , "br ${} ${PositiveInteger}"          , onInstruction_br           , False, False, False);
-    NCC_addRule(cc, "I-br_if"        , "br_if ${} ${PositiveInteger}"       , onInstruction_br_if        , False, False, False);
+    NCC_addRule(cc, "I-i32.lt_s"     , "i32.lt_s"                           , onInstruction_i32_lt_s     , False, False, False);
     NCC_addRule(cc, "I-call_indirect", "call_indirect ${} ${TypeIndex}"     , onInstruction_call_indirect, False, False, False); // The function type is needed for type checking only.
                                                                                                                               // The indirect call pops the desired function index
                                                                                                                               // from the stack, or from a nested instruction.
@@ -918,13 +1040,14 @@ static struct NCC* prepareCC() {
                                    "${I-i32.add}       |"
                                    "${I-i32.sub}       |"
                                    "${I-i32.and}       |"
-                                   "${I-loop}          |"
                                    "${I-block}         |"
+                                   "${I-loop}          |"
                                    "${I-end}           |"
-                                   "${I-i32.eq}        |"
-                                   "${I-i32.eqz}       |"
                                    "${I-br}            |"
                                    "${I-br_if}         |"
+                                   "${I-i32.eq}        |"
+                                   "${I-i32.eqz}       |"
+                                   "${I-i32.lt_s}      |"
                                    "${I-call_indirect} |"
                                    "${I-return}         ", 0, False, False, False);
 
@@ -1101,9 +1224,9 @@ static void callFunction(NWM_Function functionHandle) {
 
     // Execute,
     uint32_t instructionsCount = NVector.size(&function->instructions);
-    for (int32_t i=0; i<instructionsCount; i++) {
+    for (int32_t ip=0; ip<instructionsCount; ip++) {
 
-        struct Instruction* instruction = NVector.get(&function->instructions, i);
+        struct Instruction* instruction = NVector.get(&function->instructions, ip);
         switch(instruction->type) {
             case INST_i32_const:
                 NByteVector.pushBack32Bit(stack, instruction->argument.int32);
@@ -1182,17 +1305,47 @@ static void callFunction(NWM_Function functionHandle) {
                 NByteVector.pushBack32Bit(stack, value1);
                 continue;
             }
-            case INST_i32_and: NOT_IMPLEMENTED_YET(i32.and);
-            case INST_loop: NOT_IMPLEMENTED_YET(loop);
-            case INST_block: NOT_IMPLEMENTED_YET(block);
-            case INST_end: NOT_IMPLEMENTED_YET(end);
-            case INST_i32_eq: NOT_IMPLEMENTED_YET(i32.eq);
-            case INST_i32_eqz: NOT_IMPLEMENTED_YET(i32.eqz);
-            case INST_br: NOT_IMPLEMENTED_YET(br);
-            case INST_br_if: NOT_IMPLEMENTED_YET(br_if);
+            case INST_i32_and: {
+                int32_t value1, value2;
+                NByteVector.popBack32Bit(stack, &value2);
+                NByteVector.popBack32Bit(stack, &value1);
+                value1 &= value2;
+                NByteVector.pushBack32Bit(stack, value1);
+                continue;
+            }
+            case INST_block: continue;
+            case INST_loop: continue;
+            case INST_end: continue;
+            case INST_br: {
+                //NLOGE("sdf", "br destination: %d", instruction->argument);
+                ip = instruction->argument.int32 - 1;
+                continue;
+            }
+            case INST_br_if: {
+                //NLOGE("sdf", "br_if destination: %d", instruction->argument);
+                int32_t condition; NByteVector.popBack32Bit(stack, &condition);
+                if (condition) ip = instruction->argument.int32 - 1;
+                continue;
+            }
+            case INST_i32_eq: {
+                int32_t value2; NByteVector.popBack32Bit(stack, &value2);
+                int32_t value1; NByteVector.popBack32Bit(stack, &value1);
+                NByteVector.pushBack32Bit(stack, value1 == value2 ? 1 : 0);
+                continue;
+            }
+            case INST_i32_eqz: {
+                int32_t value; NByteVector.popBack32Bit(stack, &value);
+                NByteVector.pushBack32Bit(stack, value ? 0 : 1);
+                continue;
+            }
+            case INST_i32_lt_s: {
+                int32_t value2; NByteVector.popBack32Bit(stack, &value2);
+                int32_t value1; NByteVector.popBack32Bit(stack, &value1);
+                NByteVector.pushBack32Bit(stack, value1 < value2 ? 1 : 0);
+                continue;
+            }
             case INST_call_indirect: NOT_IMPLEMENTED_YET(call_indirect);
-            case INST_return:
-                goto functionEnd;
+            case INST_return: goto functionEnd;
             default: ;
         }
     }

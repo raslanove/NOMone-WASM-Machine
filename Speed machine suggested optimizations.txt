@@ -1,0 +1,9 @@
+Speed machine optimizations:
+============================
+- Instructions that access locals and globals (and the likes) need to lookup the target type before they can perform their actions. Create separate instructions for different type sizes and substitute them in place of the original instructions beforehand.
+- Groups of instructions that regularly get called together can be grouped into complex instructions that take their grouped parameters and produce their grouped outputs. This removes the overhead of calling the procedure of each individual instruction.
+- block and loop instructions can be removed altogether instead of being treated as nops.
+- Tail-calling of course.
+- Have your vector operations implemented as macros, to make sure they are inlined and remove the call overhead. Hopefully modern processors' caches are large enough.
+- Instructions that act on offsets that may or may not be aligned can be replaced by different versions of the same instruction based on the offset alignment (which can be checked beforehand).
+
