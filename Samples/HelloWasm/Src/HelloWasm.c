@@ -35,26 +35,32 @@ void NMain(int argc, char *argv[]) {
             "  (type (;1;) (func (param i32 i32) (result i32)))\n"
             "  (func $__wasm_call_ctors (type 0))\n"
             "  (func $foo (type 1) (param i32 i32) (result i32)\n"
-            "    i32.const 0\n"
-            "    local.set 0\n"
-            "    i32.const 100000000\n"
-            "    local.set 1\n"
-            "    block  ;; label = @1\n"
-            "      loop  ;; label = @2\n"
-            "        i32.const 1\n"
-            "        local.get 0\n"
-            "        i32.add\n"
-            "        local.set 0\n"
-            "        local.get 1\n"
-            "        i32.const 1\n"
-            "        i32.sub\n"
-            "        local.tee 1\n"
-            "        i32.eqz\n"
-            "        br_if 1\n"
-            "        br 0\n"
-            "      end\n"
-            "    end\n"
+            "    (local i32 i32 i32 i32 i32 i32)\n"
+            "    global.get 0\n"
+            "    local.set 2\n"
+            "    i32.const 16\n"
+            "    local.set 3\n"
+            "    local.get 2\n"
+            "    local.get 3\n"
+            "    i32.sub\n"
+            "    local.set 4\n"
+            "    local.get 4\n"
             "    local.get 0\n"
+            "    i32.store offset=12\n"
+            "    local.get 4\n"
+            "    local.get 1\n"
+            "    i32.store offset=8\n"
+            "    local.get 4\n"
+            "    i32.load offset=12\n"
+            "    local.set 5\n"
+            "    local.get 4\n"
+            "    i32.load offset=8\n"
+            "    local.set 6\n"
+            "    local.get 5\n"
+            "    local.get 6\n"
+            "    i32.shr_s\n"
+            "    local.set 7\n"
+            "    local.get 7\n"
             "    return)\n"
             "  (table (;0;) 1 1 funcref)\n"
             "  (memory (;0;) 1)\n"
@@ -89,8 +95,8 @@ void NMain(int argc, char *argv[]) {
     if (!function) NLOGE("HelloWasm.NMain()", "Function not found.");
 
     struct NByteVector* machineStack = machine->getStack(machine, 0);
-    NByteVector.pushBack32Bit(machineStack, 5);
-    NByteVector.pushBack32Bit(machineStack, 7);
+    NByteVector.pushBack32Bit(machineStack, 24);
+    NByteVector.pushBack32Bit(machineStack, 1);
     machine->callFunction(function);
     int32_t returnValue;
     NByteVector.popBack32Bit(machineStack, &returnValue);

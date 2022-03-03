@@ -1,10 +1,6 @@
 #include <stdint.h>
 
-int32_t foo(int32_t arg1, int32_t arg2) {
-    int32_t sum=0;
-    for (int32_t i=0; i<100000000; i++) {
-        sum++;
-    }
-    return sum;
+int32_t foo(int32_t value1, int32_t value2) {
+    return value1 >> value2;
 }
 

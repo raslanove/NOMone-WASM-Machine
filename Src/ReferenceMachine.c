@@ -29,6 +29,9 @@ typedef enum {
     INST_i32_add,
     INST_i32_sub,
     INST_i32_and,
+    INST_i32_shl,
+    INST_i32_shr_u,
+    INST_i32_shr_s,
     INST_block,
     INST_loop,
     INST_end,
@@ -559,6 +562,9 @@ static void onInstruction_global_set   (struct NCC* ncc, struct NString* ruleNam
 static void onInstruction_i32_add      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_add      ); }
 static void onInstruction_i32_sub      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_sub      ); }
 static void onInstruction_i32_and      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_and      ); }
+static void onInstruction_i32_shl      (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_shl      ); }
+static void onInstruction_i32_shr_u    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_shr_u    ); }
+static void onInstruction_i32_shr_s    (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_i32_shr_s    ); }
 static void onInstruction_block        (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_block        ); }
 static void onInstruction_loop         (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_loop         ); }
 static void onInstruction_end          (struct NCC* ncc, struct NString* ruleName, int32_t variablesCount) { createAndPushInstructionNoArgument       (ncc, INST_end          ); }
@@ -1014,6 +1020,9 @@ static struct NCC* prepareCC() {
     NCC_addRule(cc, "I-i32.add"      , "i32.add"                            , onInstruction_i32_add      , False, False, False);
     NCC_addRule(cc, "I-i32.sub"      , "i32.sub"                            , onInstruction_i32_sub      , False, False, False);
     NCC_addRule(cc, "I-i32.and"      , "i32.and"                            , onInstruction_i32_and      , False, False, False);
+    NCC_addRule(cc, "I-i32.shl"      , "i32.shl"                            , onInstruction_i32_shl      , False, False, False);
+    NCC_addRule(cc, "I-i32.shr_u"    , "i32.shr_u"                          , onInstruction_i32_shr_u    , False, False, False);
+    NCC_addRule(cc, "I-i32.shr_s"    , "i32.shr_s"                          , onInstruction_i32_shr_s    , False, False, False);
     NCC_addRule(cc, "I-block"        , "block ${} ${Result}|${Empty}"       , onInstruction_block        , False, False, False);
     NCC_addRule(cc, "I-loop"         , "loop  ${} ${Result}|${Empty}"       , onInstruction_loop         , False, False, False);
     NCC_addRule(cc, "I-end"          , "end"                                , onInstruction_end          , False, False, False);
@@ -1040,6 +1049,9 @@ static struct NCC* prepareCC() {
                                    "${I-i32.add}       |"
                                    "${I-i32.sub}       |"
                                    "${I-i32.and}       |"
+                                   "${I-i32.shl}       |"
+                                   "${I-i32.shr_u}     |"
+                                   "${I-i32.shr_s}     |"
                                    "${I-block}         |"
                                    "${I-loop}          |"
                                    "${I-end}           |"
@@ -1314,6 +1326,31 @@ static void callFunction(NWM_Function functionHandle) {
                 NByteVector.popBack32Bit(stack, &value1);
                 value1 &= value2;
                 NByteVector.pushBack32Bit(stack, value1);
+                continue;
+            }
+            case INST_i32_shl: {
+                int32_t value, shift;
+                NByteVector.popBack32Bit(stack, &shift);
+                NByteVector.popBack32Bit(stack, &value);
+                value <<= shift;
+                NByteVector.pushBack32Bit(stack, value);
+                continue;
+            }
+            case INST_i32_shr_u: {
+                uint32_t value;
+                int32_t  shift;
+                NByteVector.popBack32Bit(stack, &shift);
+                NByteVector.popBack32Bit(stack, (int32_t *) &value);
+                value >>= shift;
+                NByteVector.pushBack32Bit(stack, value);
+                continue;
+            }
+            case INST_i32_shr_s: {
+                int32_t value, shift;
+                NByteVector.popBack32Bit(stack, &shift);
+                NByteVector.popBack32Bit(stack, &value);
+                value >>= shift;
+                NByteVector.pushBack32Bit(stack, value);
                 continue;
             }
             case INST_block: continue;
